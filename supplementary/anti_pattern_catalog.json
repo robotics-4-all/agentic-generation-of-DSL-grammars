@@ -1,0 +1,156 @@
+[
+  {
+    "id": "AP1",
+    "name": "Ambiguous Choice Ordering",
+    "structural_dimension": "Parser determinism",
+    "problem": "Alternatives with overlapping token patterns are ordered in a way that causes the parser or the LLM to select the wrong construct.",
+    "symptoms": [
+      "Valid-looking models fail because an alternative is matched too early.",
+      "LLMs produce examples that look plausible but are parsed as the wrong rule."
+    ],
+    "problematic_construct": "Action:\n    IntAction | FloatAction | StringAction\n;",
+    "optimized_rewriting": "Action:\n    FloatAction | IntAction | StringAction\n;",
+    "rationale": "When alternatives overlap, order them consistently according to textX/parser behavior and the intended recognition priority."
+  },
+  {
+    "id": "AP2",
+    "name": "Incorrect Parentheses Scope and Modifier Placement",
+    "structural_dimension": "Parser determinism",
+    "problem": "Repetition or optionality modifiers apply to a larger sequence than intended because parentheses include boundary literals.",
+    "symptoms": [
+      "The LLM repeats entire blocks including boundary markers.",
+      "The parser expects repeated delimiters or accepts malformed block structures."
+    ],
+    "problematic_construct": "Section:\n    ('start' field1=ID field2=STRING 'end')*\n;",
+    "optimized_rewriting": "Section:\n    'start' (field1=ID field2=STRING)* 'end'\n;",
+    "rationale": "Boundary literals should normally be outside repeated or optional groups; only variable content should be repeated."
+  },
+  {
+    "id": "AP3",
+    "name": "Missing Explicit Root Rule",
+    "structural_dimension": "Scope definition",
+    "problem": "The grammar defines individual components but no complete top-level model structure.",
+    "symptoms": [
+      "The parser consumes the first valid section and reports Expected EOF when later sections appear.",
+      "LLMs cannot infer the required global order or composition of a complete model."
+    ],
+    "problematic_construct": "Metadata:\n    'Metadata' name=STRING 'end'\n;\n\nEntity:\n    'Entity' name=ID 'end'\n;",
+    "optimized_rewriting": "Model:\n    metadata=Metadata?\n    entities*=Entity\n;\n\nMetadata:\n    'Metadata' name=STRING 'end'\n;\n\nEntity:\n    'Entity' name=ID 'end'\n;",
+    "rationale": "A root rule tells both the parser and the LLM what a complete model looks like."
+  },
+  {
+    "id": "AP4",
+    "name": "Rule Declaration Dependency Disorder",
+    "structural_dimension": "Scope definition",
+    "problem": "Composite or root rules reference rules before those component rules are declared.",
+    "symptoms": [
+      "Unexpected parser failures.",
+      "LLMs see the complete model rule before understanding the components it references."
+    ],
+    "problematic_construct": "Model:\n    imports*=Import\n    entities*=Entity\n;\n\nImport:\n    'import' uri=STRING\n;\n\nEntity:\n    'Entity' name=ID 'end'\n;",
+    "optimized_rewriting": "Import:\n    'import' uri=STRING\n;\n\nEntity:\n    'Entity' name=ID 'end'\n;\n\nModel:\n    imports*=Import\n    entities*=Entity\n;",
+    "rationale": "Declaring simpler component rules before composite rules improves readability and reduces reference-order confusion."
+  },
+  {
+    "id": "AP5",
+    "name": "Non-Standard or Inconsistent Terminology",
+    "structural_dimension": "Token consistency",
+    "problem": "The grammar uses verbose or unusual names for familiar programming concepts without a domain reason.",
+    "symptoms": [
+      "LLMs mix terminology such as bool versus boolean or str versus string.",
+      "Generated models use common conventions that the grammar rejects."
+    ],
+    "problematic_construct": "DataType:\n    'integer' | 'floatingPoint' | 'boolean'\n;",
+    "optimized_rewriting": "DataType:\n    'int' | 'float' | 'bool'\n;",
+    "rationale": "LLMs have strong priors over common programming terminology; aligning grammar tokens with those priors can improve valid model generation."
+  },
+  {
+    "id": "AP6",
+    "name": "Unintended Strict Ordering",
+    "structural_dimension": "Structural explicitness",
+    "problem": "The grammar forces users to write sections or properties in one fixed order even when order is semantically irrelevant.",
+    "symptoms": [
+      "Models fail only because declarations appear in a different but reasonable order.",
+      "LLMs follow the natural-language prompt order instead of the grammar order."
+    ],
+    "problematic_construct": "Model:\n    metadata=Metadata?\n    brokers*=Broker\n    entities*=Entity\n    actions*=Action\n;",
+    "optimized_rewriting": "Model:\n    (\n        metadata=Metadata?\n        brokers*=Broker\n        entities*=Entity\n        actions*=Action\n    )#\n;",
+    "rationale": "textX enforces sequence by default. Use unordered groups when order should not matter, or make the required order explicit when order is semantically meaningful."
+  },
+  {
+    "id": "AP7",
+    "name": "Inconsistent Block Closure",
+    "structural_dimension": "Structural explicitness",
+    "problem": "Some top-level blocks require end while similar blocks do not, or embedded structures are closed like independent declarations.",
+    "symptoms": [
+      "LLMs add or omit end inconsistently.",
+      "Validity depends on subtle distinctions that are not visible from examples."
+    ],
+    "problematic_construct": "StateTrigger:\n    'StateTrigger'\n    (\n        'entity:' entity=[Entity]\n        'property:' property=ID\n    )#\n    'end'\n;",
+    "optimized_rewriting": "StateTrigger:\n    'StateTrigger'\n    (\n        'entity:' entity=[Entity]\n        'property:' property=ID\n    )#\n;",
+    "rationale": "Use end consistently for independently defined, referenceable top-level blocks; avoid end for embedded configuration fragments."
+  },
+  {
+    "id": "AP8",
+    "name": "Quoted Property Access",
+    "structural_dimension": "Token consistency",
+    "problem": "Property access rules use STRING where ID is expected.",
+    "symptoms": [
+      "The grammar requires unnatural syntax such as sensor.\"temperature\".",
+      "LLMs generate natural dot notation such as sensor.temperature, which then fails."
+    ],
+    "problematic_construct": "Condition:\n    entity=[Entity] '.' property=STRING operator=Operator value=Value\n;",
+    "optimized_rewriting": "Condition:\n    entity=[Entity] '.' property=ID operator=Operator value=Value\n;",
+    "rationale": "Dot notation normally uses unquoted identifiers. The grammar should match the syntax LLMs and developers naturally expect."
+  },
+  {
+    "id": "AP9",
+    "name": "Inconsistent Expression Patterns Across Contexts",
+    "structural_dimension": "Structural explicitness",
+    "problem": "Semantically equivalent expressions use different syntax in different parts of the grammar.",
+    "symptoms": [
+      "LLMs transfer syntax from one context to another and produce invalid models.",
+      "Users must learn multiple forms for the same conceptual operation."
+    ],
+    "problematic_construct": "Condition:\n    entity=[Entity] '.' property=ID operator=Operator value=Value\n;\n\nTrigger:\n    'state:' entity=[Entity] operator=Operator value=Value\n;",
+    "optimized_rewriting": "PropertyComparison:\n    entity=[Entity] '.' property=ID operator=Operator value=Value\n;\n\nCondition:\n    comparison=PropertyComparison\n;\n\nTrigger:\n    'state:' comparison=PropertyComparison\n;",
+    "rationale": "Reusing the same expression pattern across triggers, conditions, filters, and actions improves predictability and reduces invalid transfer."
+  },
+  {
+    "id": "AP10",
+    "name": "Left Recursion",
+    "structural_dimension": "Recursive stability",
+    "problem": "A rule directly or indirectly references itself as the leftmost symbol.",
+    "symptoms": [
+      "Parser errors such as maximum recursion depth exceeded.",
+      "LLMs generate nested expressions that the grammar cannot parse."
+    ],
+    "problematic_construct": "Expression:\n    Expression '+' Term\n  | Term\n;",
+    "optimized_rewriting": "Expression:\n    left=Term (operator=('+' | '-') right=Term)*\n;",
+    "rationale": "textX cannot handle left recursion. Use base cases plus repetition operators to express repeated or chained expressions."
+  },
+  {
+    "id": "AP11",
+    "name": "Overly Strict Missing Optionality",
+    "structural_dimension": "Structural explicitness",
+    "problem": "Fields that are often omitted in realistic models are required by the grammar.",
+    "symptoms": [
+      "LLMs generate concise valid-looking models that fail because optional metadata, descriptions, units, or configuration fields are missing."
+    ],
+    "problematic_construct": "Entity:\n    'Entity' name=ID\n    'description:' description=STRING\n    'freq:' freq=FLOAT\n    'end'\n;",
+    "optimized_rewriting": "Entity:\n    'Entity' name=ID\n    ('description:' description=STRING)?\n    ('freq:' freq=FLOAT)?\n    'end'\n;",
+    "rationale": "Optionality should reflect actual domain requirements. Making incidental fields mandatory increases invalid generations without improving semantic expressiveness."
+  },
+  {
+    "id": "AP12",
+    "name": "Missing Alternative Surface Forms",
+    "structural_dimension": "Parser determinism",
+    "problem": "The grammar supports only one wording or structure for a concept that naturally appears in multiple equivalent forms.",
+    "symptoms": [
+      "LLMs generate semantically plausible variants that the grammar rejects."
+    ],
+    "problematic_construct": "ComparisonOperator:\n    'equals'\n;",
+    "optimized_rewriting": "ComparisonOperator:\n    'equals' | '==' | 'is'\n;",
+    "rationale": "For concepts with common equivalent surface forms, carefully adding alternatives can improve robustness while avoiding excessive ambiguity."
+  }
+]

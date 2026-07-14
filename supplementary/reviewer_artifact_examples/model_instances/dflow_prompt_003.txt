@@ -1,0 +1,2 @@
+create an assistant which presents the nearest charging stations using /openstreetmaps/get_charging_stations. 
+First it collects from the user the latitude the longitude and the radius from the user and then using eservices with host: 'r4a.issel.ee.auth.gr' port: 8080 gets the path: '/openstreetmaps/get_charging_stations'

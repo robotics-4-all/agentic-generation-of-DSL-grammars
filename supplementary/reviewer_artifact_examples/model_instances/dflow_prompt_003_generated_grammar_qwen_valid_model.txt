@@ -1,0 +1,85 @@
+entities
+    Entity latitude_value
+        "latitude", "lat", "position north"
+    end
+    Entity longitude_value
+        "longitude", "lng", "position east"
+    end
+    Entity radius_value
+        "radius", "range", "distance"
+    end
+end
+
+synonyms
+    Synonym charging_terms
+        "charging station", "ev station", "electric vehicle charging", "charger"
+    end
+end
+
+gslots
+    user_latitude : float,
+    user_longitude : float,
+    user_radius : float
+end
+
+triggers
+    Intent get_charging_stations
+        "find" S:charging_terms, "locate" S:charging_terms
+    end
+    Intent provide_latitude
+        "my latitude is" TE:latitude_value, "i am at latitude" TE:latitude_value
+    end
+    Intent provide_longitude
+        "my longitude is" TE:longitude_value, "i am at longitude" TE:longitude_value
+    end
+    Intent provide_radius
+        "within radius" TE:radius_value, "radius of" TE:radius_value
+    end
+end
+
+dialogues
+    Dialogue charging_station_finder
+        on: get_charging_stations
+        responses: collect_location_form
+    end
+    Dialogue latitude_collection
+        on: provide_latitude
+        responses: longitude_collection
+    end
+    Dialogue longitude_collection
+        on: provide_longitude
+        responses: radius_collection
+    end
+    Dialogue radius_collection
+        on: provide_radius
+        responses: fetch_charging_stations
+    end
+end
+
+eservices
+    EServiceHTTP charging_station_service
+        verb: GET
+        host: "r4a.issel.ee.auth.gr"
+        port: 8080
+        path: "/openstreetmaps/get_charging_stations"
+    end
+end
+
+connectors
+    Connector slack
+        token: "xoxb-slack-token"
+        channel: "#charging-stations"
+        signing_secret: "slack-signing-secret"
+    end
+end
+
+access_controls
+    Roles
+        admin, user
+        default: user
+    end
+    Policy station_access
+        on: get_charging_stations, provide_latitude, provide_longitude, provide_radius
+        roles: admin, user
+    end
+end
