@@ -1,0 +1,203 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationRule
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'virtual' | 'composite'
+;
+
+DataType:
+    'bool' | 'int' | 'float' | 'string' | 'array' | 'object'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+BehaviorType:
+    'readable' | 'writable' | 'executable' | 'configurable'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING | ArrayValue | ObjectValue
+;
+
+PropertyDef:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior=BehaviorType
+;
+
+PlainAuth:
+    'auth' 'plain' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'auth' 'apikey' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    PlainAuth | ApiKeyAuth | CertAuth
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topics:' '-' topics*=STRING['-'])?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'broker' 'redis' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityDefinition:
+    'entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=STRING)?
+        ('broker:' broker=[BrokerConfig])?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'event' entity=[EntityDefinition] 'property' property=ID
+;
+
+TimeTrigger:
+    'time' schedule=STRING
+;
+
+StateTrigger:
+    'state' entity=[EntityDefinition] 'property' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TriggerCondition:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+SimpleCondition:
+    entity=[EntityDefinition] 'property' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionDef:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+SetAction:
+    'set' entity=[EntityDefinition] 'property' property=ID 'to' value=PropertyValue
+;
+
+CallAction:
+    'call' entity=[EntityDefinition] 'behavior' behavior=ID ('with' params=ObjectValue)?
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+ActionDef:
+    SetAction | CallAction | NotifyAction
+;
+
+AutomationRule:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

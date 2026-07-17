@@ -1,0 +1,332 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (authentications*=Authentication)
+        (entities*=Entity)
+        (automations*=Automation)
+        (conditions*=Condition)
+        (actions*=Action)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('email:' email=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=KeyLocation)
+    )#
+    'end'
+;
+
+KeyLocation:
+    'header' | 'query' | 'body'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('address:' address=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=Location)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'virtual'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL | Array | Object
+;
+
+Array:
+    '[' items*=PropertyValue[','] ']'
+;
+
+Object:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=[Condition])
+        ('action:' action=[Action])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+Location:
+    'Location' '(' x=FLOAT ',' y=FLOAT (',' z=FLOAT)? ')'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('trigger:' trigger=[Condition])
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('mode:' mode=AutomationMode)?
+    )#
+    'end'
+;
+
+AutomationMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+Condition:
+    SimpleCondition | ComplexCondition | TimeCondition | StateCondition
+;
+
+SimpleCondition:
+    'Condition<Simple>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=STRING)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+    )#
+    'end'
+;
+
+ComplexCondition:
+    'Condition<Complex>' name=ID
+    (
+        ('conditions:' '-' conditions*=[Condition]['-'])
+        ('operator:' operator=LogicalOperator)
+    )#
+    'end'
+;
+
+TimeCondition:
+    'Condition<Time>' name=ID
+    (
+        ('time:' time=TimeSpec)
+        ('operator:' operator=TimeOperator)?
+    )#
+    'end'
+;
+
+StateCondition:
+    'Condition<State>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('state:' state=STRING)
+        ('duration:' duration=INT)?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+TimeOperator:
+    'at' | 'before' | 'after' | 'between'
+;
+
+TimeSpec:
+    Time | DateTimeRange | CronExpression
+;
+
+Time:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+DateTimeRange:
+    start=Time '-' end=Time
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+Action:
+    DeviceAction | NotificationAction | ScriptAction | DelayAction
+;
+
+DeviceAction:
+    'Action<Device>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('command:' command=STRING)
+        ('parameters:' parameters=Object)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('recipients:' '-' recipients*=STRING['-'])?
+    )#
+    'end'
+;
+
+ScriptAction:
+    'Action<Script>' name=ID
+    (
+        ('script:' script=STRING)
+        ('language:' language=ScriptLanguage)?
+        ('parameters:' parameters=Object)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'Action<Delay>' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'slack' | 'webhook'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'shell' | 'lua'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;

@@ -1,0 +1,268 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (authentications*=Authentication)
+        (entities*=Entity)
+        (automations*=Automation)
+        (conditions*=Condition)
+        (actions*=Action)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topics:' '-' topics*=STRING['-'])?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('basePath:' basePath=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    PlainAuth | TokenAuth | CertAuth
+;
+
+PlainAuth:
+    'Auth<Plain>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('states:' '-' states*=EntityState['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'string' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | Array | Object
+;
+
+Array:
+    '[' items*=PropertyValue[','] ']'
+;
+
+Object:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('triggers:' '-' triggers*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+    )#
+    'end'
+;
+
+EntityState:
+    name=ID ':' value=PropertyValue
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('triggers:' '-' triggers*=[Condition]['-'])
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('schedule:' schedule=Schedule)?
+    )#
+    'end'
+;
+
+Schedule:
+    CronSchedule | IntervalSchedule | TimeSchedule
+;
+
+CronSchedule:
+    'Cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'Interval' '(' seconds=INT ')'
+;
+
+TimeSchedule:
+    'Time' '(' time=STRING ')'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('type:' conditionType=ConditionType)
+        ('expression:' expression=LogicalExpression)
+    )#
+    'end'
+;
+
+ConditionType:
+    'state' | 'time' | 'event' | 'threshold' | 'composite'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ComparisonExpression:
+    '(' expr=LogicalExpression ')' |
+    left=ValueExpression comparator=ComparisonOperator right=ValueExpression |
+    single=ValueExpression
+;
+
+ValueExpression:
+    EntityReference | PropertyValue | FunctionCall
+;
+
+EntityReference:
+    entity=[Entity] ('.' property=ID)?
+;
+
+FunctionCall:
+    function=ID '(' params*=PropertyValue[','] ')'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])?
+        ('operation:' operation=ActionOperation)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry:' retry=RetryConfig)?
+    )#
+    'end'
+;
+
+ActionType:
+    'control' | 'notify' | 'log' | 'execute' | 'compute'
+;
+
+ActionOperation:
+    'set' | 'get' | 'toggle' | 'send' | 'call' | 'execute'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+RetryConfig:
+    'Retry' '(' attempts=INT ',' delay=INT ')'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

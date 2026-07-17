@@ -1,0 +1,297 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=SystemMetadata)?
+    (
+        (brokers*=BrokerConfig)
+        (authentication*=AuthenticationConfig)
+        (entities*=EntityDefinition)
+        (automations*=AutomationRule)
+        (conditions*=ConditionSpec)
+        (actions*=ActionDefinition)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+SystemMetadata:
+    'SystemMetadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+BehaviorDefinition:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters*=BehaviorParameter[','] ')')?
+;
+
+BehaviorType:
+    'read' | 'write' | 'subscribe' | 'publish' | 'execute' | 'monitor'
+;
+
+BehaviorParameter:
+    name=ID '=' value=PropertyValue
+;
+
+AutomationRule:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDefinition)
+        ('conditions:' '-' conditions*=[ConditionSpec]['-'])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+TriggerDefinition:
+    EventTrigger | TimeTrigger | PropertyTrigger
+;
+
+EventTrigger:
+    'event' '(' source=[EntityDefinition] ',' event_type=STRING ')'
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+PropertyTrigger:
+    'property' '(' entity=[EntityDefinition] ',' property=STRING ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('timeout:' timeout=INT)?
+        ('retry:' retry=INT)?
+        ('parallel:' parallel=BOOL)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+ConditionSpec:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ComparisonExpression:
+    left=PropertyReference operator=ComparisonOperator right=ExpressionValue
+    | '(' expression=LogicalExpression ')'
+;
+
+PropertyReference:
+    entity=[EntityDefinition] '.' property=STRING
+;
+
+ExpressionValue:
+    PropertyValue | PropertyReference
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[EntityDefinition])
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'call_method' | 'send_message' | 'execute_script' | 'notify'
+;
+
+ActionParameter:
+    name=ID '=' value=PropertyValue
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

@@ -1,0 +1,208 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        auth*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+Array:
+    '[' items*=Value[','] ']'
+;
+
+Object:
+    '{' pairs*=KeyValuePair[','] '}'
+;
+
+KeyValuePair:
+    key=STRING ':' value=Value
+;
+
+Value:
+    STRING | FLOAT | INT | BOOL | Array | Object
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=Value)?
+;
+
+SetAction:
+    'set' '(' property=[Property] ',' value=Value ')'
+;
+
+GetAction:
+    'get' '(' property=[Property] ')'
+;
+
+TriggerAction:
+    'trigger' '(' event=STRING ')'
+;
+
+CustomAction:
+    'custom' '(' code=STRING ')'
+;
+
+Action:
+    SetAction | GetAction | TriggerAction | CustomAction
+;
+
+Behavior:
+    name=ID ':' action=Action
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[Broker])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('exchange:' exchange=STRING)?
+    )#
+    'end'
+;
+
+CoapBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('resource:' resource=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | CoapBroker
+;
+
+TimeTrigger:
+    'time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'event' '(' event=STRING ')'
+;
+
+PropertyTrigger:
+    'property' '(' entity=[Entity] '.' property=ID ',' operator=ComparisonOperator ',' value=Value ')'
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | PropertyTrigger
+;
+
+PropertyCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=Value
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=STRING
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+PrimitiveCondition:
+    PropertyCondition | TimeCondition
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

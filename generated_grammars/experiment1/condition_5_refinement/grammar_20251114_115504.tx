@@ -1,0 +1,287 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+EntityDef:
+    SensorEntity | ActuatorEntity | HybridEntity
+;
+
+SensorEntity:
+    'Entity<Sensor>' name=ID
+    (
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('data_type:' data_type=DataType)
+        ('sampling_rate:' sampling_rate=NUMBER)?
+        ('precision:' precision=NUMBER)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Entity<Actuator>' name=ID
+    (
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('command_type:' command_type=DataType)
+        ('response_time:' response_time=NUMBER)?
+        ('power_consumption:' power_consumption=NUMBER)?
+    )#
+    'end'
+;
+
+HybridEntity:
+    'Entity<Hybrid>' name=ID
+    (
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('input_type:' input_type=DataType)
+        ('output_type:' output_type=DataType)
+        ('modes:' modes=StringList)?
+    )#
+    'end'
+;
+
+PropertyList:
+    properties*=PropertyDef[',']
+;
+
+BehaviorList:
+    behaviors*=BehaviorDef[',']
+;
+
+StringList:
+    values*=STRING[',']
+;
+
+PropertyDef:
+    name=ID ':' type=DataType ('=' default_value=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters*=BehaviorParameter[','] ')')?
+;
+
+BehaviorParameter:
+    name=ID '=' value=PropertyValue
+;
+
+TriggerCondition:
+    EventTrigger | TimeTrigger | ThresholdTrigger
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' time_expr=TimeExpression ')'
+;
+
+ThresholdTrigger:
+    'Threshold' '(' entity=[EntityDef] ',' property=STRING ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionExpr:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+    | '(' condition=ConditionExpr ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | SystemAction
+;
+
+EntityAction:
+    'EntityAction' '(' entity=[EntityDef] ',' command=STRING ',' value=PropertyValue? ')'
+;
+
+NotificationAction:
+    'Notification' '(' message=STRING ',' channel=STRING? ')'
+;
+
+SystemAction:
+    'SystemAction' '(' action_type=STRING ',' parameters*=ActionParameter[',']? ')'
+;
+
+ActionParameter:
+    name=ID '=' value=PropertyValue
+;
+
+TimeExpression:
+    CronExpression | IntervalExpression | AbsoluteTime
+;
+
+CronExpression:
+    'cron' '(' pattern=STRING ')'
+;
+
+IntervalExpression:
+    'interval' '(' duration=NUMBER ',' unit=TimeUnit ')'
+;
+
+AbsoluteTime:
+    'at' '(' time=STRING ')'
+;
+
+ScheduleExpr:
+    'schedule' '(' time_expr=TimeExpression ')'
+;
+
+EntityRef:
+    entity=[EntityDef] ('.' property=ID)?
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | EntityRef
+;
+
+DataType:
+    'float' | 'int' | 'bool' | 'string' | 'json' | 'binary'
+;
+
+BehaviorType:
+    'reactive' | 'proactive' | 'adaptive' | 'learning' | 'scheduled'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<=' | '>=' | '<' | '>' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' conditions*=ConditionExpr)?
+        ('actions:' actions*=ActionDef)
+        ('priority:' priority=INT)?
+        ('enabled:' enabled=BOOL)?
+        ('schedule:' schedule=ScheduleExpr)?
+    )#
+    'end'
+;

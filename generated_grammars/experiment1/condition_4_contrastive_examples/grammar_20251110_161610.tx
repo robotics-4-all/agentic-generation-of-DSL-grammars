@@ -1,0 +1,249 @@
+SmartEnvironmentModel:
+    metadata=Metadata?
+    (
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+HTTPEndpoint:
+    'endpoint' path=STRING 'method:' method=HTTPMethod
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[Authentication])?
+        ('topics:' topics*=STRING[','])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('endpoints:' endpoints*=HTTPEndpoint)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | RedisBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+PropertyPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=PropertyPair[','] '}'
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ObjectValue | ArrayValue
+;
+
+EntityProperty:
+    'property' name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+EntityBehavior:
+    'behavior' name=ID 'triggers:' triggers*=[Condition] 'actions:' actions*=[Action]
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[Broker])?
+        ('topic:' topic=STRING)?
+        ('properties:' properties*=EntityProperty)?
+        ('behaviors:' behaviors*=EntityBehavior)?
+        ('location:' location=STRING)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=[Condition])
+        ('conditions:' conditions*=[Condition])?
+        ('actions:' actions*=[Action])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+LogicalOperator:
+    'AND' | 'OR' | 'NOT'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+ValueExpression:
+    PropertyReference | LiteralValue
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+    | '(' expression=LogicalExpression ')'
+    | PropertyReference
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('entities:' entities*=[Entity])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notify' | 'log' | 'call_service' | 'script'
+;
+
+ActionParameter:
+    'param' name=ID ':' value=PropertyValue
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])?
+        ('parameters:' parameters*=ActionParameter)?
+        ('delay:' delay=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;

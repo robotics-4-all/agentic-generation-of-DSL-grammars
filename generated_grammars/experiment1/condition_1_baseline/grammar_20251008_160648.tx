@@ -1,0 +1,328 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=BrokerConfiguration)*
+    (authentication*=AuthenticationMechanism)*
+    (entities*=EntityDefinition)*
+    (automations*=AutomationDeclaration)*
+    (conditions*=ConditionSpecification)*
+    (actions*=ActionDefinition)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfiguration:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+AuthenticationMechanism:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)?
+    )#
+    'end'
+;
+
+TokenType:
+    'Bearer' | 'API' | 'JWT'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfiguration])?
+        ('properties:' '-' properties*=EntityProperty['-'])?
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+EntityProperty:
+    name=ID ':' property_type=PropertyType ('=' default_value=PropertyValue)?
+;
+
+PropertyType:
+    'string' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL | PropertyObject | PropertyArray
+;
+
+PropertyObject:
+    '{' items*=PropertyObjectItem[','] '}'
+;
+
+PropertyObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+PropertyArray:
+    '[' items*=PropertyValue[','] ']'
+;
+
+EntityBehavior:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'on_demand' | 'continuous'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[ConditionSpecification]['-'])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+TimeSchedule:
+    CronExpression | TimeInterval
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+TimeInterval:
+    'interval' '(' seconds=INT ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDefinition] ',' event_type=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDefinition] ',' property=ID ',' condition=StateCondition ')'
+;
+
+StateCondition:
+    operator=ComparisonOperator value=PropertyValue
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'async'
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    left=LogicalTerm (operator=LogicalOperator right=LogicalTerm)*
+;
+
+LogicalTerm:
+    '(' expression=LogicalExpression ')' | SimpleCondition
+;
+
+SimpleCondition:
+    EntityCondition | ValueCondition | TimeCondition
+;
+
+EntityCondition:
+    entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ValueCondition:
+    left=PropertyValue operator=ComparisonOperator right=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=TimeValue
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=ActionTarget)?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'control' | 'notify' | 'log' | 'trigger' | 'update'
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | ExternalTarget
+;
+
+EntityTarget:
+    'entity' '(' entity=[EntityDefinition] ')'
+;
+
+ServiceTarget:
+    'service' '(' service_name=STRING ')'
+;
+
+ExternalTarget:
+    'external' '(' url=STRING ')'
+;
+
+ActionParameter:
+    name=ID '=' value=ParameterValue
+;
+
+ParameterValue:
+    STRING | INT | FLOAT | BOOL | ParameterObject | ParameterArray | EntityReference
+;
+
+ParameterObject:
+    '{' items*=ParameterObjectItem[','] '}'
+;
+
+ParameterObjectItem:
+    key=STRING ':' value=ParameterValue
+;
+
+ParameterArray:
+    '[' items*=ParameterValue[','] ']'
+;
+
+EntityReference:
+    'ref' '(' entity=[EntityDefinition] ('.' property=ID)? ')'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

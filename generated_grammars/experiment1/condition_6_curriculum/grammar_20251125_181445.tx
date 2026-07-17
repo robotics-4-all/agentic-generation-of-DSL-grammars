@@ -1,0 +1,207 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        broker=BrokerConfig?
+        authentication=AuthConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata' '{'
+        (
+            ('name:' name=STRING)?
+            ('version:' version=STRING)?
+            ('author:' author=STRING)?
+            ('description:' description=STRING)?
+        )#
+    '}'
+;
+
+BrokerConfig:
+    'broker' '{'
+        (
+            ('host:' host=STRING)
+            ('port:' port=INT)
+            ('protocol:' protocol=BrokerProtocol)
+            ('ssl:' ssl=BOOL)?
+            ('keepalive:' keepalive=INT)?
+        )#
+    '}'
+;
+
+BrokerProtocol:
+    'mqtt' | 'amqp' | 'http' | 'websocket'
+;
+
+AuthConfig:
+    'authentication' '{'
+        (
+            ('type:' auth_type=AuthType)
+            ('username:' username=STRING)?
+            ('password:' password=STRING)?
+            ('token:' token=STRING)?
+            ('certificate:' certificate=STRING)?
+        )#
+    '}'
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate' | 'none'
+;
+
+Entity:
+    'entity' name=ID '{'
+        (
+            ('type:' entity_type=EntityType)
+            ('topic:' topic=STRING)?
+            ('properties:' '{' properties*=Property '}' )?
+            ('behaviors:' '{' behaviors*=Behavior '}' )?
+        )#
+    '}'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'motion' | 'door' | 'window'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'float' | 'int' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behavior:
+    'behavior' name=ID '{'
+        (
+            ('command:' command=STRING)
+            ('payload:' payload=STRING)?
+            ('response_topic:' response_topic=STRING)?
+        )#
+    '}'
+;
+
+Automation:
+    'automation' name=ID '{'
+        (
+            ('trigger:' trigger=Trigger)
+            ('conditions:' '{' conditions*=Condition '}' )?
+            ('actions:' '{' actions*=Action '}' )
+            ('enabled:' enabled=BOOL)?
+        )#
+    '}'
+;
+
+Trigger:
+    TimeTrigger | StateTrigger | EventTrigger | ManualTrigger
+;
+
+TimeTrigger:
+    'time' '{'
+        (
+            ('at:' time=TimeValue)?
+            ('interval:' interval=INT)?
+            ('cron:' cron=STRING)?
+        )#
+    '}'
+;
+
+StateTrigger:
+    'state' '{'
+        (
+            ('entity:' entity=[Entity])
+            ('property:' property=ID)
+            ('from:' from_value=PropertyValue)?
+            ('to:' to_value=PropertyValue)
+            ('for:' duration=INT)?
+        )#
+    '}'
+;
+
+EventTrigger:
+    'event' '{'
+        (
+            ('type:' event_type=STRING)
+            ('data:' data=STRING)?
+        )#
+    '}'
+;
+
+ManualTrigger:
+    'manual' '{' '}'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+EntityAction:
+    'entity_action' '{'
+        (
+            ('entity:' entity=[Entity])
+            ('behavior:' behavior=ID)?
+            ('property:' property=ID)?
+            ('value:' value=PropertyValue)?
+        )#
+    '}'
+;
+
+NotificationAction:
+    'notify' '{'
+        (
+            ('message:' message=STRING)
+            ('channel:' channel=STRING)?
+            ('priority:' priority=NotificationPriority)?
+        )#
+    '}'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+DelayAction:
+    'delay' '{'
+        ('duration:' duration=INT)
+    '}'
+;
+
+ScriptAction:
+    'script' '{'
+        (
+            ('code:' code=STRING)
+            ('language:' language=ScriptLanguage)?
+        )#
+    '}'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'lua' | 'shell'
+;

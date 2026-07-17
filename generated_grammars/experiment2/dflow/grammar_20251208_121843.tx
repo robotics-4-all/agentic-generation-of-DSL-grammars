@@ -1,0 +1,365 @@
+dFlow:
+(
+   (metadata=Metadata)?
+   
+   ('entities'
+       entities*=TrainableEntity
+   'end')?
+   
+   ('synonyms'
+       synonyms*=Synonym
+   'end')?
+   
+   ('gslots'
+       gslots*=GlobalSlot
+   'end')?
+   
+   ('triggers'
+       triggers*=Trigger
+   'end')?
+   
+   ('dialogues'
+       dialogues*=Dialogue
+   'end')?
+   
+   ('eservices'
+       eservices*=EServiceDef
+   'end')?
+   
+   ('connectors'
+       connectors*=Connector
+   'end')?
+   
+   ('access_controls'
+       access_control=AccessControl
+   'end')?
+)#
+;
+
+Metadata:
+   'Metadata'
+   (
+       ('name:' name=STRING)
+       ('description:' description=STRING)?
+       ('author:' author=STRING)?
+       ('email:' email=STRING)?
+   )#
+   'end'
+;
+
+TrainableEntity:
+   'Entity' name=ID
+       words+=STRING[',']
+   'end'
+;
+
+PretrainedEntity:
+   'PERSON' | 'NORP' | 'FAC' | 'ORG' | 'GPE' | 'LOC' | 'PRODUCT' | 'EVENT' | 
+   'WORK_OF_ART' | 'LAW' | 'LANGUAGE' | 'DATE' | 'TIME' | 'PERCENT' | 'MONEY' | 
+   'QUANTITY' | 'ORDINAL' | 'CARDINAL'
+;
+
+Synonym:
+   'Synonym' name=ID
+       words+=STRING[',']
+   'end'
+;
+
+GlobalSlot:
+   name=ID ':' type=ParameterType ('=' default=ParameterValue)?
+;
+
+Intent:
+   'Intent' name=ID
+       phrases+=IntentPhrase[',']
+   'end'
+;
+
+Event:
+   'Event' name=ID
+       uri=STRING
+   'end'
+;
+
+Trigger:
+   Intent | Event
+;
+
+IntentPhrase:
+   IntentPhraseElement*
+;
+
+IntentPhraseElement:
+   STRING |
+   TrainableEntityRef |
+   PretrainedEntityRef |
+   SynonymRef
+;
+
+TrainableEntityRef:
+   'TE:' entity=[TrainableEntity]
+;
+
+PretrainedEntityRef:
+   'PE:' entity=PretrainedEntity ('[' examples+=STRING[','] ']')?
+;
+
+SynonymRef:
+   'S:' synonym=[Synonym]
+;
+
+Response:
+   ActionGroup | Form | ResponseRef
+;
+
+ResponseRef:
+   name=ID
+;
+
+ActionGroup:
+   'ActionGroup' name=ID
+       actions+=Action
+   'end'
+;
+
+Form:
+   'Form' name=ID
+       params+=FormParam
+   'end'
+;
+
+FormParam:
+   name=ID ':' type=ParameterType '=' source=FormParamSource
+;
+
+FormParamSource:
+   HRIParamSource | EServiceParamSource
+;
+
+HRIParamSource:
+   'HRI' '(' text=Text (',' '[' extractions+=ExtractionSource[','] ']')? ')'
+;
+
+ExtractionSource:
+   TrainableEntityRef | PretrainedEntityRef | IntentExtraction
+;
+
+IntentExtraction:
+   intent=[Intent] ':' value=ParameterValue
+;
+
+EServiceParamSource:
+   EServiceCall
+;
+
+SpeakAction:
+   'Speak' '(' text=Text ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+FireEventAction:
+   'FireEvent' '(' uri=Text ',' message=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+RESTCallAction:
+   EServiceCall
+;
+
+SetFormSlotAction:
+   'SetFSlot' '(' slot=[FormParam] ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetGlobalSlotAction:
+   'SetGSlot' '(' slot=[GlobalSlot] ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+Action:
+   SpeakAction | FireEventAction | RESTCallAction | SetFormSlotAction | SetGlobalSlotAction
+;
+
+Dialogue:
+   'Dialogue' name=ID
+       'on:' triggers+=[Trigger][',']
+       'responses:' responses+=Response[',']
+   'end'
+;
+
+EServiceHTTP:
+   'EServiceHTTP' name=ID
+   (
+       ('verb:' verb=HTTPVerb)
+       ('host:' host=STRING)
+       ('port:' port=INT)?
+       ('path:' path=STRING)?
+   )#
+   'end'
+;
+
+EServiceDef:
+   EServiceHTTP
+;
+
+EServiceCall:
+   service=[EServiceHTTP] '('
+   (
+       ('query=' '[' query_params*=ServiceParam[','] ']')?
+       ('header=' '[' header_params*=ServiceParam[','] ']')?
+       ('path=' '[' path_params*=ServiceParam[','] ']')?
+       ('body=' '[' body_params*=ServiceParam[','] ']')?
+   )#
+   ')' ('[' filter=ResponseFilter ']')? ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+ServiceParam:
+   name=ID '=' value=ParameterValue
+;
+
+ResponseFilter:
+   elements+=ResponseElement['.']
+;
+
+ResponseElement:
+   ID | INT
+;
+
+HTTPVerb:
+   'GET' | 'POST' | 'PUT'
+;
+
+SlackConnector:
+   'Connector' 'slack'
+   (
+       ('token:' token=STRING)
+       ('channel:' channel=STRING)
+       ('signing_secret:' signing_secret=STRING)
+   )#
+   'end'
+;
+
+TelegramConnector:
+   'Connector' 'telegram'
+   (
+       ('token:' token=STRING)
+       ('verify:' verify=STRING)
+       ('webhook_url:' webhook_url=STRING)
+   )#
+   'end'
+;
+
+Connector:
+   SlackConnector | TelegramConnector
+;
+
+Roles:
+   'Roles'
+       roles+=Word[',']
+       'default:' default=Word
+   'end'
+;
+
+Users:
+   'Users'
+       assignments*=UserRoleAssignment
+   'end'
+;
+
+UserRoleAssignment:
+   role=Word ':' users+=Word[',']
+;
+
+Policy:
+   'Policy' name=ID
+       'on:' actions+=Word[',']
+       'roles:' roles+=Word[',']
+   'end'
+;
+
+Path:
+   'Path' path=STRING
+   'end'
+;
+
+Authentication:
+   'Authentication'
+       'method:' method=AuthMethod
+       ('slot_name:' slot_name=Word)?
+   'end'
+;
+
+AccessControl:
+   (
+       roles=Roles
+       (users=Users)?
+       policies*=Policy
+       (path=Path)?
+       authentication=Authentication
+   )#
+;
+
+AuthMethod:
+   'slot' | 'user_id' | 'slack' | 'telegram'
+;
+
+ParameterType:
+   'int' | 'float' | 'str' | 'bool' | 'list' | 'dict'
+;
+
+FormParamRef:
+   param=[FormParam] ('[' index=IndexExpression ']')?
+;
+
+GlobalSlotRef:
+   slot=[GlobalSlot] ('[' index=IndexExpression ']')?
+;
+
+IndexExpression:
+   ID | INT | STRING
+;
+
+UserProperty:
+   'USER:' property=UserPropertyType
+;
+
+SystemProperty:
+   'SYSTEM:' property=SystemPropertyType
+;
+
+EnvProperty:
+   UserProperty | SystemProperty
+;
+
+UserPropertyType:
+   'NAME' | 'SURNAME' | 'AGE' | 'EMAIL' | 'PHONE' | 'CITY' | 'ADDRESS'
+;
+
+SystemPropertyType:
+   'TIME' | 'LOCATION' | 'RANDOM_INT' | 'RANDOM_FLOAT'
+;
+
+TextElement:
+   STRING | FormParamRef | GlobalSlotRef | EnvProperty
+;
+
+Text:
+   elements+=TextElement
+;
+
+List:
+   '[' items*=ParameterValue[','] ']'
+;
+
+Dict:
+   '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+   key=STRING ':' value=ParameterValue
+;
+
+Word:
+   ID | STRING
+;
+
+ParameterValue:
+   FLOAT | INT | STRING | BOOL | List | Dict | 
+   FormParamRef | GlobalSlotRef | EnvProperty | Text
+;

@@ -1,0 +1,141 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (broker=BrokerConfig)?
+    (authentication=Authentication)?
+    (entities*=Entity)*
+    (automations*=Automation)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    'Broker'
+    (
+        ('type:' broker_type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'MQTT' | 'AMQP' | 'HTTP' | 'CoAP'
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+AuthMethod:
+    'basic' | 'token' | 'certificate' | 'oauth'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'system' | 'virtual'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+Capability:
+    name=ID '(' parameters*=Parameter[','] ')'
+;
+
+Parameter:
+    name=ID ':' param_type=DataType
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Condition)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+Condition:
+    left=ConditionExpression (operator=LogicalOperator right=ConditionExpression)*
+;
+
+ConditionExpression:
+    '(' expr=Condition ')' |
+    SimpleCondition
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID comparison=ComparisonOperator value=PropertyValue
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+Action:
+    EntityAction | SystemAction | NotificationAction
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+SystemAction:
+    'call' capability=[Capability] ('with' parameters*=ActionParameter[','])?
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' recipient=STRING)?
+;
+
+ActionParameter:
+    name=ID '=' value=PropertyValue
+;

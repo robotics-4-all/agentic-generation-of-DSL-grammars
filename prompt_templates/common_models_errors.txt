@@ -1,0 +1,435 @@
+--------------------COMMON MODELS ERRORS NOT NECESERRILY GRAMMAR ERRORS-----------------
+--------1-----------
+Metadata
+    name: "homeAutomation"
+    version: "1.0.0"
+end
+
+This is a common error  name: "homeAutomation"
+
+
+---------2----------
+Entity tempSensor
+    type: sensor
+    topic: "home/temperature"
+    frequency: 30.0
+    broker: homeBroker
+    attributes:
+        - temperature: float -> constant(22.0)
+        - humidity: int -> constant(50)
+end
+
+The grammar expects frequency instead of freq
+
+
+OLD REQUIREMENTS:
+Here are the requirements for Grammar you should create:
+R1 - The grammar should support AMQP broker configuration with fields: "host", "port", "vhost", "topicExchange", "rpcExchange", "ssl", "auth". Users should be able to set a broker name that serves as the broker ID.
+R2 - The grammar should support MQTT broker configuration with fields: "host", "port", "ssl", "basePath", "webPath", "webPort", "auth". Users should be able to set a broker name that serves as the broker ID.
+R3 - The grammar should support Redis broker configuration with fields: "host", "port", "db", "ssl", "auth". Users should be able to set a broker name that serves as the broker ID.
+R4 - The grammar should support authentication through:
+Username & password authentication
+API Key authentication
+Certificate authentication (supporting both direct certificate content and certificate file path)
+R5 - The grammar should support broker connection declarations using references to broker types (AMQP, MQTT, Redis) with associated authentication configurations.
+R6 - The grammar should support numeric value generation functions:
+Constant values: constant(value)
+Linear values: linear(start, step)
+Gaussian values: gaussian(value, maxValue, sigma)
+Sinus values: sinus(dc, amplitude, step)
+Sawtooth values: saw(min, max, step)
+R7 - The grammar should support noise declarations:
+Uniform Noise: uniform(min, max)
+Gaussian Noise: gaussian(mu, sigma)
+R8 - The grammar should support attribute declarations:
+Numeric attributes (INT and FLOAT) with optional default values
+Boolean attributes with optional default values
+String attributes with optional default values
+List attributes with optional default arrays
+Dictionary attributes with optional default key-value pairs
+Time attributes with hour:minute:second format
+R9 - The grammar should support entity types: "sensor", "actuator", "hybrid"
+R10 - The grammar should support entity declarations with fields:
+type: One of the supported entity types
+topic: String value for message topic
+description: Optional string description
+freq: Numeric frequency value
+broker: Reference to a MessageBroker
+attributes: List of supported attributes with optional value generators and noise
+R11 - The grammar should support operators:
+String operators: ~, !~, ==, !=, has, in, not in
+Numeric operators: >=, >, <=, <, ==, !=
+Logical operators: AND, OR, NOT, XOR, NOR, XNOR, NAND
+Boolean operators: is not, is
+List operators: ==, !=, is, is not, in, not in
+Dictionary operators: ==, !=, is, is not
+Time operators: >=, >, <=, <, ==, !=, is not, is
+R12 - The grammar should support condition declarations:
+Numeric conditions with numeric operators
+String conditions with string operators
+Boolean conditions with boolean operators
+List conditions with list operators
+Dictionary conditions with dictionary operators
+Time conditions with time operators
+R13 - The grammar should support action declarations:
+Integer actions: Setting integer values on entity attributes
+Float actions: Setting floating-point values on entity attributes
+Boolean actions: Setting boolean values on entity attributes
+String actions: Setting string values on entity attributes
+List actions: Setting list values on entity attributes
+Dictionary actions: Setting dictionary values on entity attributes
+R14 - The grammar should support automation declarations with fields:
+name: Automation identifier
+condition: Triggering condition
+description: Optional automation description
+actions: List of actions to execute
+freq: Execution frequency
+enabled: Boolean enable/disable flag
+continuous: Boolean continuous execution flag
+checkOnce: Boolean single-check execution flag
+delay: Optional execution delay (float value)
+starts: List of automations to trigger after execution
+stops: List of automations to stop after execution
+after: List of prerequisite automations
+R15 - The grammar should support declaration and combination of brokers, entities, and automations within a unified model structure.
+R16 - The grammar should support metadata declarations with fields:
+name: System name
+version: Version string
+author: Optional author name
+email: Optional author email
+description: Optional system description
+R17 - The grammar should support import statements for modular composition and code reuse across DSL files.
+R18 - The grammar should support Real-Time Monitor configuration with:
+broker: Reference to message broker for monitoring
+namespace: Optional monitoring namespace
+eventTopic: Topic for event monitoring
+logsTopic: Topic for logs monitoring
+R19 - The grammar should support advanced numeric attribute functions:
+Standard deviation: std(attribute, size)
+Variance: var(attribute, size)
+Mean: mean(attribute, size)
+Minimum: min(attribute, size)
+Maximum: max(attribute, size)
+Multiplication: mul(attribute1, attribute2, ...)
+R20 - The grammar should support data replay functionality:
+Array-based replay: replay([values], times)
+File-based replay: replay(filepath) for all attribute types
+R21 - The grammar should support mathematical expressions in conditions with:
+Arithmetic operators: +, -, *, /
+Support for numeric attributes and constants
+Proper operator precedence and parenthetical grouping
+R22 - The grammar should support range-based conditions with in range [min, max] syntax for numeric attributes.
+R23 - The grammar should support complex data structures:
+Time data type: hour:minute:second format
+Date data type: month:day:year format
+Nested lists and dictionaries with type-safe elements
+Support for mixed-type collections
+R24 - The grammar should support condition grouping and complex logical expressions with parenthetical grouping and logical operators between condition groups.
+R25 - The grammar should support comprehensive type system with:
+Primitive types: NUMBER, STRING, BOOL, INT, FLOAT
+Complex types: List, Dict, Time, Date
+Object references and fully qualified names (FQN) for cross-referencing.
+
+
+
+NEW REQUIREMENTS
+Here are the requirements for Grammar you should create:
+R1 - The grammar should support metadata declarations with system information.
+R2 - The grammar should support broker configuration and management.
+R3 - The grammar should support authentication mechanisms.
+R4 - The grammar should support entity definitions with properties and behaviors.
+R5 - The grammar should support automation declarations with execution control.
+R6 - The grammar should support condition specifications for logical evaluation.
+R7 - The grammar should support action definitions for system operations.
+R8 - The grammar should support a unified model structure that combines these components.
+
+
+
+
+
+
+The models of the grammar you will create should be declared in this way
+Example 1: 
+Metadata
+	name: A_NAME // change this
+	version: "0.0.0" // change this
+	description: "" // fill this
+	author: "the author" // change this
+	email: "the.author@gmail.com" // change this
+end
+
+Broker<MQTT> BROKER_NAME // change this
+	host: "{{locsys_broker.host}}" // fill this
+	port: {{locsys_broker.port}} // change this
+	auth:
+		username: "" // fill this
+		password: "" // fill this
+end
+
+Example 2: 
+// Broker ------->
+Broker<MQTT> default_broker
+    host:"localhost"
+    port: 1555
+    ssl:true
+    auth:
+        username:"MY_USERNAME"
+        password:"MY_PASSWORD"
+end
+// Sensor ------->
+Entity sn_ambientLight_1
+    type:sensor
+    topic:"MuJrT.sensors.sn_ambientLight_1"
+    broker:default_broker
+    freq:5.0
+    attributes:
+        - luminosity:float -> constant(0) with noise uniform(30,70)
+end
+// Sensor ------->
+Entity sn_humidity_3
+    type:sensor
+    topic:"MuJrT.sensors.sn_humidity_3"
+    broker:default_broker
+    freq:10.0
+    attributes:
+        - humidity:float -> constant(0) with noise gaussian(60,0.05)
+end
+// Actuator ------->
+Entity ef_light_2
+    type:actuator
+    topic:"MuJrT.actuators.ef_light_2"
+    broker:default_broker
+    attributes:
+        - state:bool
+        - brightness:float
+end
+// Automation ------->
+Automation my_automation
+    condition:sn_humidity_3.humidity > 20
+    enabled:true
+    continuous:false
+    actions:
+        - ef_light_2.brightness:2.0
+        - ef_light_2.state:true
+end
+// Metadata ------->
+Metadata
+    name:MuJrT
+    version:"0.1.0"
+    description:"BRIEF_DESCRIPTION"
+    author:"AUTHOR_NAME_HERE"
+    email:"CONTACT_EMAIL_HERE"
+end
+// RTMonitor ------->
+RTMonitor
+    broker:default_broker
+    namespace:"smauto.MuJrT"
+    eventTopic:"event"
+    logsTopic:"logs"
+end
+
+Example 3: 
+Metadata
+    name: Indoor_Environmental_Station_Automations
+    version: "0.1.0"
+    author: "John Konsta"
+    email: "jkon@gmail.com"
+    description: "The automations for the Indoor Environmental Station that are necessary to work properly"
+end
+
+Broker<MQTT> LocSys_EMQX_MQTT_Web
+    host: "{myIp}"
+    port: 1883
+    ssl: True
+    auth:
+        username: "nasen"
+        password: "uncrackable"
+end
+
+RTMonitor
+    broker: LocSys_EMQX_MQTT_Web
+    namespace: "smauto.IndoorEnvironmentalStation"
+    eventTopic: "event"
+    logsTopic: "logs"
+end
+
+Entity indoor_environmental_station
+    type: hybrid
+    topic: "indoorEnvironmetalStation.control"
+    broker: LocSys_EMQX_MQTT_Web
+    attributes:
+        - notificationsControlCommand: str
+        - notificationsStatus: str
+        - updateIndoorEnvironmentalStationStatus: str
+        - danger: str
+        - informAboutDanger: str
+
+
+end
+
+Entity IAQ_sensor
+    type: sensor
+    topic: "indoorEnvironmetalStation.iaqSensor"
+    broker: LocSys_EMQX_MQTT_Web
+    attributes:
+        - temperature: float
+        - pressure: float
+        - humidity: float
+        - iaqAccuracy: str
+        - IAQ: float
+        - CO2eq: float
+        - VOCeq: float
+        - IAQsts: str
+end
+
+Entity luminosity_sensor
+    type: sensor
+    topic: "indoorEnvironmetalStation.luminosity"
+    broker: LocSys_EMQX_MQTT_Web
+    attributes:
+        - luminosity: float
+end
+
+Entity hazardous_gases_detection_sensor
+    type: sensor
+    topic: "indoorEnvironmetalStation.hazardousGasesSensor"
+    broker: LocSys_EMQX_MQTT_Web
+    attributes:
+        - alert: str
+        - updateHazardousGasesSensor: str 
+end
+
+Entity fire_detection_sensor
+    type: sensor
+    topic: "indoorEnvironmetalStation.fireSensor"
+    broker: LocSys_EMQX_MQTT_Web
+    attributes:
+        - alert: str
+        - updateFireSensorStatus: str 
+end
+
+Entity indoor_environmental_station_buzzer
+    type: actuator
+    topic: "indoorEnvironmetalStation.buzzer"
+    broker: LocSys_EMQX_MQTT_Web
+    attributes:
+        - buzzerControlCommand: str
+        - buzzerStatus: str
+end
+
+Automation deactivatedNotificationsIES
+	condition:
+		indoor_environmental_station.notificationsStatus == "Deactivated"
+	enabled: true  
+	continuous: true  
+    starts:
+         - activatedNotificationsIES
+    stops:
+         - HazardousGasesDetection      
+         - FireDetection
+         - displayDangerInfo
+         - BadIAQ
+         - waitingGoodIAQ
+end
+
+Automation activatedNotificationsIES
+	condition:
+		indoor_environmental_station.notificationsStatus == "Activated"
+	enabled: true  
+	continuous: false  
+    starts:
+         - HazardousGasesDetection      
+         - FireDetection
+         - BadIAQ
+end
+
+
+Automation HazardousGasesDetection 
+	condition:
+		(hazardous_gases_detection_sensor.alert == "HAZARDOUS GASES DETECTED") AND (indoor_environmental_station_buzzer.buzzerStatus == "Deactivated")
+	enabled: true  
+	continuous: false  
+    actions:
+        - indoor_environmental_station.notificationsControlCommand: ""
+        - indoor_environmental_station.notificationsStatus: ""
+        - indoor_environmental_station.updateIndoorEnvironmentalStationStatus: ""
+        - indoor_environmental_station.danger: "true"
+        - indoor_environmental_station.informAboutDanger: "true"
+        - indoor_environmental_station_buzzer.buzzerControlCommand: "activate"
+        - indoor_environmental_station_buzzer.buzzerStatus:"updating"
+        - hazardous_gases_detection_sensor.alert:"updating"
+        - hazardous_gases_detection_sensor.updateHazardousGasesSensor: "true"
+    starts:      
+         - FireDetection
+         - displayDangerInfo
+         - BadIAQ
+
+
+end 
+
+Automation FireDetection 
+	condition:
+		(fire_detection_sensor.alert == "FIRE DETECTED") AND (indoor_environmental_station_buzzer.buzzerStatus == "Deactivated")
+	enabled: true  
+	continuous: false  
+    actions:
+        - indoor_environmental_station.notificationsControlCommand: ""
+        - indoor_environmental_station.notificationsStatus: ""
+        - indoor_environmental_station.updateIndoorEnvironmentalStationStatus: ""
+        - indoor_environmental_station.danger: "true"
+        - indoor_environmental_station.informAboutDanger: "true"
+        - indoor_environmental_station_buzzer.buzzerControlCommand: "activate"
+        - indoor_environmental_station_buzzer.buzzerStatus:"updating"
+        - fire_detection_sensor.alert:"updating"
+        - fire_detection_sensor.updateFireSensorStatus: "true"
+    starts:
+         - HazardousGasesDetection
+         - displayDangerInfo
+         - BadIAQ
+end 
+
+Automation displayDangerInfo 
+	condition:
+          ((hazardous_gases_detection_sensor.alert == "HAZARDOUS GASES DETECTED") AND (indoor_environmental_station_buzzer.buzzerStatus == "Activated")) OR ((fire_detection_sensor.alert == "FIRE DETECTED") AND (indoor_environmental_station_buzzer.buzzerStatus == "Activated"))
+	enabled: true  
+	continuous: false  
+    actions:
+        - indoor_environmental_station.notificationsControlCommand: ""
+        - indoor_environmental_station.notificationsStatus: ""
+        - indoor_environmental_station.updateIndoorEnvironmentalStationStatus: ""
+        - indoor_environmental_station.danger: "true"
+        - indoor_environmental_station.informAboutDanger: "true"
+    starts:
+         - FireDetection
+         - HazardousGasesDetection      
+         - displayDangerInfo
+         - BadIAQ
+end 
+
+Automation BadIAQ 
+	condition:
+		(IAQ_sensor.IAQ >= 101) AND (indoor_environmental_station_buzzer.buzzerStatus == "Deactivated")
+	enabled: true  
+	continuous: false  
+    actions:
+        - indoor_environmental_station_buzzer.buzzerControlCommand: "activate"
+        - indoor_environmental_station_buzzer.buzzerStatus:"updating"
+    starts:
+         - HazardousGasesDetection      
+         - FireDetection
+         - displayDangerInfo
+         - waitingGoodIAQ
+    stops:
+         - BadIAQ
+end
+
+Automation waitingGoodIAQ
+	condition:
+		IAQ_sensor.IAQ <= 100
+	enabled: true  
+	continuous: false  
+    starts:
+         - HazardousGasesDetection      
+         - FireDetection
+         - BadIAQ
+end

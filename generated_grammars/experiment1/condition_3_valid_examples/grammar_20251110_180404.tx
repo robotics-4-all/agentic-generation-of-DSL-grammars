@@ -1,0 +1,236 @@
+SmartEnvironmentModel:
+    (
+        imports*=Import
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action=[Action]
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+TimeTrigger:
+    'Time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] ',' event=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionTerm:
+    SimpleCondition | '(' expression=ConditionExpression ')'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+NotificationType:
+    'email' | 'sms' | 'push' | 'slack'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+DeviceAction:
+    'Action<Device>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('command:' command=STRING)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('message:' message=STRING)
+        ('type:' notificationType=NotificationType)
+        ('recipients:' '-' recipients*=STRING['-'])?
+    )#
+    'end'
+;
+
+ScriptAction:
+    'Action<Script>' name=ID
+    (
+        ('script:' script=STRING)
+        ('language:' language=ScriptLanguage)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+    )#
+    'end'
+;
+
+Action:
+    DeviceAction | NotificationAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

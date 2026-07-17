@@ -1,0 +1,365 @@
+dFlowModel:
+(
+    ('entities'
+        entities*=TrainableEntity
+    'end')?
+    
+    ('synonyms'
+        synonyms*=Synonym
+    'end')?
+    
+    ('gslots'
+        gslots*=GlobalSlot[',']
+    'end')?
+    
+    ('triggers'
+        triggers*=Trigger
+    'end')?
+    
+    ('dialogues'
+        dialogues*=Dialogue
+    'end')?
+    
+    ('eservices'
+        eservices*=EServiceDef
+    'end')?
+    
+    ('connectors'
+        connectors*=Connector
+    'end')?
+    
+    ('access_controls'
+        access_control=AccessControlDef
+    'end')?
+)#
+;
+
+TrainableEntity:
+    'Entity' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+PretrainedEntity:
+    'PERSON' | 'NORP' | 'FAC' | 'ORG' | 'GPE' | 'LOC' | 'PRODUCT' | 'EVENT' | 
+    'WORK_OF_ART' | 'LAW' | 'LANGUAGE' | 'DATE' | 'TIME' | 'PERCENT' | 'MONEY' | 
+    'QUANTITY' | 'ORDINAL' | 'CARDINAL' | 'LOCATION'
+;
+
+Synonym:
+    'Synonym' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+EServiceDef:
+    EServiceHTTP
+;
+
+EServiceHTTP:
+    'EServiceHTTP' name=ID
+    (
+        ('verb:' verb=HTTPVerb)
+        ('host:' host=STRING)
+        ('port:' port=INT)?
+        ('path:' path=STRING)?
+    )#
+    'end'
+;
+
+HTTPVerb:
+    'GET' | 'POST' | 'PUT'
+;
+
+GlobalSlot:
+    name=ID ':' type=SlotType ('=' default=ParameterValue)?
+;
+
+SlotType:
+    'int' | 'float' | 'str' | 'bool' | 'list' | 'dict'
+;
+
+Trigger:
+    Intent | Event
+;
+
+Intent:
+    'Intent' name=ID
+        phrases+=IntentPhrase[',']
+    'end'
+;
+
+Event:
+    'Event' name=ID
+        uri=STRING
+    'end'
+;
+
+IntentPhrase:
+    elements+=IntentPhraseElement
+;
+
+IntentPhraseElement:
+    STRING | TrainableEntityRef | PretrainedEntityRef | SynonymRef
+;
+
+TrainableEntityRef:
+    'TE:' entity=[TrainableEntity]
+;
+
+PretrainedEntityRef:
+    'PE:' entity=PretrainedEntity ('[' examples+=STRING[','] ']')?
+;
+
+SynonymRef:
+    'S:' synonym=[Synonym]
+;
+
+Dialogue:
+    'Dialogue' name=ID
+        'on:' triggers+=[Trigger][',']
+        'responses:' responses+=Response[',']
+    'end'
+;
+
+Response:
+    ActionGroup | Form | ID
+;
+
+ActionGroup:
+    'ActionGroup' name=ID
+        actions+=Action
+    'end'
+;
+
+Form:
+    'Form' name=ID
+        params+=FormParam
+    'end'
+;
+
+FormParam:
+    name=ID ':' type=SlotType '=' source=FormParamSource
+;
+
+FormParamSource:
+    HRIParamSource | EServiceParamSource
+;
+
+HRIParamSource:
+    'HRI' '(' text=TextValue (',' '[' extractions+=ExtractionSource[','] ']')? ')'
+;
+
+ExtractionSource:
+    TrainableEntityRef | PretrainedEntityRef | IntentExtraction
+;
+
+IntentExtraction:
+    intent=[Intent] ':' value=ParameterValue
+;
+
+EServiceParamSource:
+    EServiceCall
+;
+
+EServiceCall:
+    service=[EServiceHTTP] '('
+    (
+        ('query=' '[' query_params*=EServiceParam[','] ']')?
+        ('header=' '[' header_params*=EServiceParam[','] ']')?
+        ('path=' '[' path_params*=EServiceParam[','] ']')?
+        ('body=' '[' body_params*=EServiceParam[','] ']')?
+    )#
+    ')' ('[' filter=ResponseFilter ']')? ('[' 'roles=' roles+=RoleName[','] ']')?
+;
+
+EServiceParam:
+    name=ID '=' value=ParameterValue
+;
+
+ResponseFilter:
+    elements+=FilterElement['.']
+;
+
+FilterElement:
+    ID | INT
+;
+
+Action:
+    SpeakAction | FireEventAction | RESTCallAction | SetFSlotAction | SetGSlotAction
+;
+
+SpeakAction:
+    'Speak' '(' text=TextValue ')' ('[' 'roles=' roles+=RoleName[','] ']')?
+;
+
+FireEventAction:
+    'FireEvent' '(' uri=TextValue ',' message=ParameterValue ')' ('[' 'roles=' roles+=RoleName[','] ']')?
+;
+
+RESTCallAction:
+    EServiceCall
+;
+
+SetFSlotAction:
+    'SetFSlot' '(' slot=FormParamRef ',' value=ParameterValue ')' ('[' 'roles=' roles+=RoleName[','] ']')?
+;
+
+SetGSlotAction:
+    'SetGSlot' '(' slot=GlobalSlotRef ',' value=ParameterValue ')' ('[' 'roles=' roles+=RoleName[','] ']')?
+;
+
+ParameterValue:
+    FLOAT | INT | STRING | BOOL | ListValue | DictValue | EnvProperty | FormParamRef | GlobalSlotRef | TextValue
+;
+
+ListValue:
+    '[' items*=ParameterValue[','] ']'
+;
+
+DictValue:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    key=STRING ':' value=ParameterValue
+;
+
+FormParamRef:
+    param=[FormParam] ('[' index=IndexValue ']')?
+;
+
+GlobalSlotRef:
+    slot=[GlobalSlot] ('[' index=IndexValue ']')?
+;
+
+IndexValue:
+    INT | STRING | ID
+;
+
+EnvProperty:
+    UserProperty | SystemProperty
+;
+
+UserProperty:
+    'USER:' property=UserPropertyType
+;
+
+SystemProperty:
+    'SYSTEM:' property=SystemPropertyType
+;
+
+UserPropertyType:
+    'NAME' | 'SURNAME' | 'AGE' | 'EMAIL' | 'PHONE' | 'CITY' | 'ADDRESS'
+;
+
+SystemPropertyType:
+    'TIME' | 'LOCATION' | 'RANDOM_INT' | 'RANDOM_FLOAT'
+;
+
+TextValue:
+    STRING | EnvProperty | FormParamRef | GlobalSlotRef
+;
+
+Connector:
+    SlackConnector | TelegramConnector
+;
+
+SlackConnector:
+    'Connector' ('name=' name=ConnectorName | name=ConnectorName)
+    (
+        ('token:' token=STRING)
+        ('channel:' channel=STRING)
+        ('signing_secret:' signing_secret=STRING)
+    )#
+    'end'
+;
+
+TelegramConnector:
+    'Connector' ('name=' name=ConnectorName | name=ConnectorName)
+    (
+        ('token:' token=STRING)
+        ('verify:' verify=STRING)
+        ('webhook_url:' webhook_url=STRING)
+    )#
+    'end'
+;
+
+ConnectorName:
+    'slack' | 'telegram'
+;
+
+AccessControlDef:
+    (
+        roles=RolesDef
+        policies*=PolicyDef
+        (path=PathDef)?
+        (users=UsersDef)?
+        authentication=AuthenticationDef
+    )#
+;
+
+RolesDef:
+    'Roles'
+        roles+=RoleName[',']
+        'default:' default=RoleName
+    'end'
+;
+
+PolicyDef:
+    'Policy' name=ID
+        'on:' actions+=ActionName[',']
+        'roles:' roles+=RoleName[',']
+    'end'
+;
+
+PathDef:
+    'Path'
+        path=STRING
+    'end'
+;
+
+UsersDef:
+    'Users'
+        assignments*=UserRoleAssignment
+    'end'
+;
+
+UserRoleAssignment:
+    role=RoleName ':' users+=UserID[',']
+;
+
+AuthenticationDef:
+    'Authentication'
+        'method:' method=AuthMethod
+        ('slot_name:' slot_name=STRING)?
+    'end'
+;
+
+AuthMethod:
+    'slot' | 'user_id' | 'slack' | 'telegram'
+;
+
+RoleName:
+    ID
+;
+
+ActionName:
+    ID
+;
+
+UserID:
+    STRING
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

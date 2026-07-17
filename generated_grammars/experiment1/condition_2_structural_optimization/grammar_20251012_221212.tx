@@ -1,0 +1,215 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'basic' '(' 'username:' username=STRING ',' 'password:' password=STRING ')'
+;
+
+TokenAuth:
+    'token' '(' 'key:' key=STRING ')'
+;
+
+CertAuth:
+    'cert' '(' 'path:' path=STRING ')'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('topics:' '-' topics*=STRING['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('exchanges:' '-' exchanges*=STRING['-'])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+PropertyType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+Object:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+Array:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | Array | Object
+;
+
+Property:
+    name=ID ':' ptype=PropertyType ('=' default=PropertyValue)?
+;
+
+BehaviorAction:
+    'read' | 'write' | 'execute' | 'notify' | 'stream'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[BrokerConfig])?
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+TimeExpression:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeValue:
+    STRING | TimeExpression
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID comparator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparator=ComparisonOperator value=TimeValue
+;
+
+ValueCondition:
+    left=PropertyValue comparator=ComparisonOperator right=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+GroupedCondition:
+    '(' expr=ConditionExpression ')'
+;
+
+ConditionTerm:
+    SimpleCondition | GroupedCondition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+Condition:
+    expr=ConditionExpression
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING ',' target=STRING ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT ')'
+;
+
+ScriptAction:
+    'script' '(' code=STRING ')'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Condition)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;

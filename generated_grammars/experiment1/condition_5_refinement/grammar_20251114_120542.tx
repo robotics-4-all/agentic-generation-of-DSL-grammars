@@ -1,0 +1,219 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+        conditions*=ConditionDef
+        actions*=ActionDef
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'reactive' | 'scheduled'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notify' | 'log' | 'script'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=STRING ')')?
+;
+
+TimeTrigger:
+    'Time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+ComparisonCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+BooleanCondition:
+    entity=[EntityDef] '.' property=ID
+;
+
+ConditionTerm:
+    ComparisonCondition | BooleanCondition | '(' expression=ConditionExpression ')'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=[ConditionDef]['-'])?
+        ('actions:' '-' actions*=[ActionDef]['-'])
+        ('priority:' priority=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ConditionDef:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('entity:' entity=[EntityDef])?
+        ('property:' property=ID)?
+    )#
+    'end'
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('entity:' entity=[EntityDef])
+        ('property:' property=ID)?
+        ('value:' value=PropertyValue)?
+        ('command:' command=STRING)?
+        ('delay:' delay=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;

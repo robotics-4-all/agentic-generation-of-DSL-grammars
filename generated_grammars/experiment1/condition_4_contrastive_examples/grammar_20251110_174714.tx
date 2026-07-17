@@ -1,0 +1,235 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('webPath:' webPath=STRING)?
+        ('webPort:' webPort=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('topicExchange:' topicE=STRING)?
+        ('rpcExchange:' rpcE=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+AuthPlain:
+    'Authentication<Plain>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+AuthApiKey:
+    'Authentication<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+    )#
+    'end'
+;
+
+AuthCert:
+    'Authentication<Cert>' name=ID
+    (
+        ('cert:' cert=STRING)?
+        ('certPath:' certPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    AuthPlain | AuthApiKey | AuthCert
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid' | 'device' | 'virtual'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' defaultValue=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action=[Action]
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+TimeTrigger:
+    'time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'event' '(' entity=[Entity] ',' eventType=STRING ')'
+;
+
+ConditionTrigger:
+    'condition' '(' condition=[Condition] ')'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | ConditionTrigger
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionExpression:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+    )#
+    'end'
+;
+
+NotificationPriority:
+    'low' | 'medium' | 'high' | 'critical'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash' | 'lua'
+;
+
+ParameterItem:
+    name=ID ':' value=PropertyValue
+;
+
+ActionParameters:
+    '{' items*=ParameterItem[','] '}'
+;
+
+EntityAction:
+    'Action<Entity>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('operation:' operation=STRING)
+        ('parameters:' parameters=ActionParameters)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)?
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+ScriptAction:
+    'Action<Script>' name=ID
+    (
+        ('script:' script=STRING)
+        ('language:' language=ScriptLanguage)?
+        ('parameters:' parameters=ActionParameters)?
+    )#
+    'end'
+;
+
+Action:
+    EntityAction | NotificationAction | ScriptAction
+;

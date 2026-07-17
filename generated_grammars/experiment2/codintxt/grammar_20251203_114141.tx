@@ -1,0 +1,237 @@
+DashboardModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDef
+        entities*=EntityDef
+        buttons*=ButtonComponent
+        components*=VisualComponent
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('codinToken:' codinToken=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    'username:' username=STRING
+    'password:' password=STRING
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid'
+;
+
+DataType:
+    'int' | 'float' | 'bool' | 'str' | 'time' | 'list' | 'dict'
+;
+
+AttributeDef:
+    name=ID ':' dataType=DataType
+;
+
+PlotType:
+    'Line' | 'Bar'
+;
+
+LegendPosition:
+    'topRight' | 'topLeft' | 'bottomRight' | 'bottomLeft'
+;
+
+Color:
+    'Red' | 'red' | 'Blue' | 'blue' | 'Yellow' | 'yellow' | 
+    'Green' | 'green' | 'Cyan' | 'cyan'
+;
+
+AlignType:
+    'Center' | 'Left' | 'Right' | 'Top' | 'Bottom' | 'Horizontal' | 'Vertical'
+;
+
+Placement:
+    'x:' x=INT 'y:' y=INT 'width:' width=INT 'height:' height=INT
+;
+
+PayloadItem:
+    attribute=ID ':' value=STRING
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('webPath:' webPath=STRING)?
+        ('webPort:' webPort=INT)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('vhost:' vhost=STRING)?
+        ('topicExchange:' topicExchange=STRING)?
+        ('rpcExchange:' rpcExchange=STRING)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('db:' db=INT)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('topic:' topic=STRING)
+        ('broker:' broker=[BrokerDef])
+        ('freq:' freq=FLOAT)?
+        ('description:' description=STRING)?
+        ('attributes:' ('-' attributes*=AttributeDef['-'])?)?
+    )#
+    'end'
+;
+
+PlotDef:
+    'Plot' name=ID
+    (
+        ('label:' label=STRING)
+        ('ptype:' ptype=PlotType)
+        ('entity:' entity=[EntityDef])
+        ('attribute:' attribute=ID)
+        ('color:' color=Color)
+        ('smooth:' smooth=BOOL)?
+    )#
+    'end'
+;
+
+ButtonComponent:
+    'Button' name=ID
+    (
+        ('label:' label=STRING)
+        ('entity:' entity=[EntityDef])
+        ('payload:' ('-' payload*=PayloadItem['-'])?)?
+    )#
+    'end'
+;
+
+GaugeComponent:
+    'Gauge' name=ID
+    (
+        ('label:' label=STRING)
+        ('entity:' entity=[EntityDef])
+        ('attribute:' attribute=ID)
+        ('minValue:' minValue=FLOAT)
+        ('maxValue:' maxValue=FLOAT)
+        ('leftColor:' leftColor=Color)
+        ('rightColor:' rightColor=Color)
+        ('levels:' levels=INT)
+        ('hideTxt:' hideTxt=BOOL)?
+        ('unit:' unit=STRING)?
+        ('position:' position=Placement)
+    )#
+    'end'
+;
+
+LogsDisplayComponent:
+    'LogsDisplay' name=ID
+    (
+        ('label:' label=STRING)
+        ('entity:' entity=[EntityDef])
+        ('attribute:' attribute=ID)
+        ('position:' position=Placement)
+    )#
+    'end'
+;
+
+ValueDisplayComponent:
+    'ValueDisplay' name=ID
+    (
+        ('label:' label=STRING)
+        ('entity:' entity=[EntityDef])
+        ('attribute:' attribute=ID)
+        ('unit:' unit=STRING)?
+        ('position:' position=Placement)
+    )#
+    'end'
+;
+
+AliveDisplayComponent:
+    'AliveDisplay' name=ID
+    (
+        ('label:' label=STRING)
+        ('entity:' entity=[EntityDef])
+        ('timeout:' timeout=INT)
+        ('position:' position=Placement)
+    )#
+    'end'
+;
+
+JsonViewerComponent:
+    'JsonViewer' name=ID
+    (
+        ('label:' label=STRING)
+        ('entity:' entity=[EntityDef])
+        ('position:' position=Placement)
+    )#
+    'end'
+;
+
+PlotViewComponent:
+    'PlotView' name=ID
+    (
+        ('label:' label=STRING)
+        ('plots:' ('-' plots*=[PlotDef]['-'])?)?
+        ('position:' position=Placement)
+        ('xAxis:' xAxis=STRING)?
+        ('yAxis:' yAxis=STRING)?
+        ('horizontalGrid:' horizontalGrid=BOOL)?
+        ('verticalGrid:' verticalGrid=BOOL)?
+        ('legend:' legend=BOOL)?
+        ('legendPosition:' legendPosition=LegendPosition)?
+        ('maxValues:' maxValues=INT)?
+    )#
+    'end'
+;
+
+ButtonGroupComponent:
+    'ButtonGroup' name=ID
+    (
+        ('label:' label=STRING)
+        ('alignTxt:' alignTxt=AlignType)?
+        ('alignBtns:' alignBtns=AlignType)?
+        ('buttons:' ('-' buttons*=[ButtonComponent]['-'])?)?
+        ('position:' position=Placement)
+    )#
+    'end'
+;
+
+VisualComponent:
+    GaugeComponent | LogsDisplayComponent | ValueDisplayComponent | 
+    AliveDisplayComponent | JsonViewerComponent | PlotViewComponent | 
+    ButtonGroupComponent | PlotDef
+;

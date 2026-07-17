@@ -1,0 +1,202 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        broker=BrokerConfig?
+        authentication=AuthenticationConfig?
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+BrokerType:
+    'mqtt' | 'amqp' | 'redis'
+;
+
+AuthMethod:
+    'basic' | 'token' | 'certificate'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'list' | 'dict'
+;
+
+BehaviorType:
+    'on_change' | 'periodic' | 'triggered' | 'continuous'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+PropertyValue:
+    ListValue | DictValue | STRING | FLOAT | INT | BOOL
+;
+
+ListValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+DictValue:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    key=STRING ':' value=PropertyValue
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeInterval:
+    value=INT unit=TimeUnit
+;
+
+TimeSpecification:
+    'at' time=TimeValue | 'every' interval=TimeInterval
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+BehaviorDefinition:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+EntityTrigger:
+    'entity' entity=[EntityDefinition] 'property' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' time_spec=TimeSpecification
+;
+
+EventTrigger:
+    'event' event_name=STRING
+;
+
+TriggerDefinition:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityCondition:
+    entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=TimeValue
+;
+
+ValueCondition:
+    operand1=PropertyValue operator=ComparisonOperator operand2=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpression ')' | SimpleCondition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionSpecification:
+    conditions*=ConditionExpression
+;
+
+EntityAction:
+    'set' entity=[EntityDefinition] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' recipient=STRING)?
+;
+
+ServiceAction:
+    'call' service_name=STRING ('with' parameters=DictValue)?
+;
+
+ActionDefinition:
+    EntityAction | NotificationAction | ServiceAction
+;
+
+ExecutionControl:
+    'mode:' mode=ExecutionMode ('delay:' delay=INT)?
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    'broker'
+    (
+        ('type:' broker_type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    'authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('cert_path:' cert_path=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDefinition)
+        ('conditions:' conditions=ConditionSpecification)?
+        ('actions:' '-' actions*=ActionDefinition['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

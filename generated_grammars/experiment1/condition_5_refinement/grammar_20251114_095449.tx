@@ -1,0 +1,217 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=Entity
+        actions*=Action
+        automations*=Automation
+    )#
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>=' | '<=' | '>' | '<' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+NotificationLevel:
+    'info' | 'warning' | 'error' | 'critical'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours'
+;
+
+Parameter:
+    name=ID ':' value=PropertyValue
+;
+
+UsernamePasswordAuth:
+    'Auth<UserPass>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    UsernamePasswordAuth | ApiKeyAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('datatype:' datatype=DataType)
+        ('value:' value=PropertyValue)?
+        ('unit:' unit=STRING)?
+        ('readonly:' readonly=BOOL)?
+    )#
+    'end'
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('action:' action=STRING)
+        ('parameters:' '-' parameters*=Parameter['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=Condition)*
+;
+
+PrimitiveCondition:
+    'entity:' entity=ID '.' property=ID comp_operator=ComparisonOperator value=PropertyValue
+;
+
+EntityAction:
+    'Action<Entity>' name=ID
+    (
+        ('target:' target=ID)
+        ('behavior:' behavior=ID)
+        ('parameters:' '-' parameters*=Parameter['-'])?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)?
+        ('level:' level=NotificationLevel)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'Action<Delay>' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)?
+    )#
+    'end'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=ID)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Condition)
+        ('actions:' '-' actions*=ID['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

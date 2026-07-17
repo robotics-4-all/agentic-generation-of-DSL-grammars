@@ -1,0 +1,338 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    brokers*=BrokerConfig
+    entities*=EntityDef
+    automations*=AutomationDef
+;
+
+Import:
+    'import' importURI=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=AuthConfig)?
+        ('topics:' '-' topics*=TopicConfig['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthConfig)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('basePath:' basePath=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthConfig)?
+    )#
+    'end'
+;
+
+TopicConfig:
+    name=ID ':' pattern=STRING
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('certFile:' certFile=STRING)
+        ('keyFile:' keyFile=STRING)?
+        ('caFile:' caFile=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('location:' location=LocationSpec)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+LocationSpec:
+    'room' ':' room=STRING |
+    'zone' ':' zone=STRING |
+    'coordinates' ':' x=FLOAT ',' y=FLOAT (',' z=FLOAT)?
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=ValueExpression)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+ValueExpression:
+    FLOAT | INT | STRING | BOOL | JsonValue
+;
+
+JsonValue:
+    '{' pairs*=JsonPair[','] '}' |
+    '[' items*=ValueExpression[','] ']'
+;
+
+JsonPair:
+    key=STRING ':' value=ValueExpression
+;
+
+BehaviorDef:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerSpec)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+    )#
+    'end'
+;
+
+CapabilityDef:
+    name=ID ':' capability=STRING
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('triggers:' '-' triggers*=TriggerSpec['-'])
+        ('conditions:' '-' conditions*=ConditionSpec['-'])?
+        ('actions:' '-' actions*=ActionSpec['-'])
+        ('schedule:' schedule=ScheduleSpec)?
+    )#
+    'end'
+;
+
+TriggerSpec:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityTrigger:
+    'EntityTrigger'
+    (
+        ('entity:' entity=[EntityDef])
+        ('property:' property=ID)
+        ('condition:' condition=ComparisonCondition)
+    )#
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('time:' time=TimeExpression)
+        ('repeat:' repeat=RepeatSpec)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('source:' source=STRING)?
+    )#
+;
+
+TimeExpression:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+RepeatSpec:
+    'daily' | 'weekly' | 'monthly' | 'interval' ':' seconds=INT
+;
+
+ConditionSpec:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+SimpleCondition:
+    ComparisonCondition | TimeCondition | StateCondition | '(' condition=ConditionSpec ')'
+;
+
+ComparisonCondition:
+    left=PropertyReference operator=ComparisonOperator right=ValueExpression
+;
+
+TimeCondition:
+    'TimeCondition'
+    (
+        ('start:' start=TimeExpression)?
+        ('end:' end=TimeExpression)?
+        ('days:' '-' days*=DayOfWeek['-'])?
+    )#
+;
+
+StateCondition:
+    'StateCondition'
+    (
+        ('entity:' entity=[EntityDef])
+        ('state:' state=STRING)
+    )#
+;
+
+PropertyReference:
+    entity=[EntityDef] '.' property=ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+ActionSpec:
+    EntityAction | NotificationAction | SceneAction | DelayAction
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('entity:' entity=[EntityDef])
+        ('command:' command=STRING)
+        ('parameters:' parameters=JsonValue)?
+    )#
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('channels:' '-' channels*=NotificationChannel['-'])?
+        ('priority:' priority=NotificationPriority)?
+    )#
+;
+
+SceneAction:
+    'SceneAction'
+    (
+        ('scene:' scene=STRING)
+        ('operation:' operation=SceneOperation)
+    )#
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+SceneOperation:
+    'activate' | 'deactivate' | 'toggle'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ConditionDef:
+    name=ID ':' condition=ConditionSpec
+;
+
+ActionDef:
+    name=ID ':' action=ActionSpec
+;
+
+ScheduleSpec:
+    'ScheduleSpec'
+    (
+        ('start:' start=TimeExpression)?
+        ('end:' end=TimeExpression)?
+        ('repeat:' repeat=RepeatSpec)?
+        ('timezone:' timezone=STRING)?
+    )#
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

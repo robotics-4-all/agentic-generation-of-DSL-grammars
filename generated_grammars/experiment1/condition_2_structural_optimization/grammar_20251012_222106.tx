@@ -1,0 +1,283 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'on_demand' | 'continuous'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+ExecutionMode:
+    'immediate' | 'queued' | 'scheduled' | 'parallel'
+;
+
+SystemMetadata:
+    'SystemInfo' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('queue:' queue=STRING)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters*=ParameterDef[','] ')')?
+;
+
+CommandDef:
+    name=ID ':' command_type=STRING ('(' parameters*=ParameterDef[','] ')')?
+;
+
+CapabilityDef:
+    name=ID ':' capability_type=STRING
+;
+
+ParameterDef:
+    name=ID ':' param_type=DataType
+;
+
+SensorEntity:
+    'Entity<Sensor>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Entity<Actuator>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('commands:' '-' commands*=CommandDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+DeviceEntity:
+    'Entity<Device>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityDef:
+    SensorEntity | ActuatorEntity | DeviceEntity
+;
+
+PropertyReference:
+    entity=[EntityDef] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ValueExpression:
+    PropertyReference | LiteralValue
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+    | '(' expr=LogicalExpression ')'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=STRING ')'
+;
+
+ConditionTrigger:
+    'Condition' '(' condition=LogicalExpression ')'
+;
+
+TriggerDef:
+    EventTrigger | TimeTrigger | ConditionTrigger
+;
+
+ConditionBlock:
+    'if' condition=LogicalExpression
+;
+
+ParameterItem:
+    name=ID ':' value=PropertyValue
+;
+
+ParameterList:
+    '{' items*=ParameterItem[','] '}'
+;
+
+SetPropertyAction:
+    'SetProperty' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+SendCommandAction:
+    'SendCommand' '(' entity=[EntityDef] ',' command=ID (',' parameters=ParameterList)? ')'
+;
+
+NotificationAction:
+    'Notify' '(' message=STRING (',' recipient=STRING)? ')'
+;
+
+HTTPAction:
+    'HTTPCall' '(' url=STRING ',' method=HTTPMethod (',' payload=STRING)? ')'
+;
+
+ActionDef:
+    SetPropertyAction | SendCommandAction | NotificationAction | HTTPAction
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionBlock)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('execution:' execution=ExecutionControl)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

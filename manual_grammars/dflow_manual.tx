@@ -1,0 +1,426 @@
+// ROOT RULE - Must be first
+dFlow:
+(
+    (metadata=Metadata)?
+
+    ('entities'
+        entities*=TrainableEntity
+    'end')?
+
+    ('synonyms'
+        synonyms*=Synonym
+    'end')?
+
+    ('gslots'
+        gslots*=GlobalSlot[',']
+    'end')?
+
+    ('triggers'
+        triggers+=Trigger
+    'end')?
+
+    ('dialogues'
+        dialogues+=Dialogue
+    'end')?
+
+    ('eservices'
+        eservices*=EServiceDef
+    'end')?
+
+    ('access_controls'
+        access_control=AccessControlDef
+    'end')?
+
+    ('connectors'
+        connectors*=Connector
+    'end')?
+
+    ('nluconfig'
+        nlu_config=NLUConfig
+    'end')?
+)#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('email:' email=STRING)?
+    )#
+    'end'
+;
+
+// TERMINALS AND HELPER RULES
+// FQN: ID('.'ID)*;
+ADDRESS_ID: /([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}/;
+
+FQN: ID+['.'];
+FQNI: ID+['.']('.*')?;
+// Import: 'import' importURI=FQNI ('as' name=ID)?;
+NID: /(.*?)\n/;
+NIDREF: NID+['.']('.*')?;
+Import: 'import' name=STRING;
+
+// Comments
+Comment: CommentLine | CommentBlock ;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;
+
+Word: /[-\w ]*\b/;
+WordExt: /[-\.\@\w ]*\b/;
+
+Connector: Slack | Telegram;
+
+Slack:
+    'Connector' name='slack'
+    (
+        ('token:' token=STRING)
+        ('channel:' channel=STRING)
+        ('signing_secret:' signing_secret=STRING)
+    )#
+    'end'
+;
+
+Telegram:
+    'Connector' name='telegram'
+    (
+        ('token:' token=STRING)
+        ('verify:' verify=STRING)
+        ('webhook_url:' webhook_url=STRING)
+    )#
+    'end'
+;
+
+
+NLUConfig:
+    (
+        ('model_name:' name=STRING)
+        ('model_weights:' weights=STRING)
+    )#
+;
+
+AccessControlDef:
+    (
+    roles=Roles
+    policies*=Policy
+    (path=Path)?
+    (users=Users)?
+    authentication=Authentication
+    )#
+;
+
+Roles:
+    'Roles'
+        words+=Word[',']
+        'default:'
+            default=Word
+    'end'
+;
+
+Policy:
+    'Policy' name=ID
+        'on:' actions+=Word[',']
+        'roles:' roles+=Word[',']
+    'end'
+;
+
+Path:
+    'Path'
+        path=STRING
+    'end'
+;
+
+Users:
+    'Users'
+        roles+=UserRoles
+    'end'
+;
+
+Authentication:
+    'Authentication'
+        'method:' method=AuthMethods
+        (
+        'slot_name:' slot_name=Word
+        )?
+    'end'
+;
+
+UserRoles: role=Word ':' users+=WordExt[','];
+
+AuthMethods: 'slot' | 'user_id' | 'slack' | 'telegram';
+
+// ENTITIY --------------------------------------------------------------
+// ----------------------------------------------------------------------
+Entity: TrainableEntity | PretrainedEntity;
+
+TrainableEntity:
+    'Entity' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+PretrainedEntity:
+    'PERSON'        |
+    'NORP'          |
+    'FAC'           |
+    'ORG'           |
+    'GPE'           |
+    'LOC'           |
+    'PRODUCT'       |
+    'EVENT'         |
+    'WORK_OF_ART'   |
+    'LAW'           |
+    'LANGUAGE'      |
+    'DATE'          |
+    'TIME'          |
+    'PERCENT'       |
+    'MONEY'         |
+    'QUANTITY'      |
+    'ORDINAL'       |
+    'CARDINAL'
+;
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+Synonym:
+    'Synonym' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+// TRIGGER --------------------------------------------------------------
+// ----------------------------------------------------------------------
+Trigger: Intent | Event;
+
+Intent:
+    'Intent' name=ID
+        phrases+=IntentPhraseComplex[',']
+    'end'
+;
+
+Event:
+    'Event' name=ID
+        uri=STRING
+    'end'
+;
+
+IntentPhraseComplex: phrases+=IntentPhrase;
+
+IntentPhrase:
+    IntentPhraseStr |
+    IntentPhraseSynonym |
+    TrainableEntityRef |
+    PretrainedEntityRef
+;
+
+IntentPhraseStr: STRING;
+
+TrainableEntityRef: 'TE:' entity=[TrainableEntity|FQN|^entities*];
+
+PretrainedEntityRef: 'PE:' entity=[PretrainedEntity|FQN|^entities*] ('[' refPreValues*=STRING[','] ']')?;
+
+IntentPhraseSynonym: 'S:' synonym=[Synonym|FQN];
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+// DIALOGUE -------------------------------------------------------------
+// ----------------------------------------------------------------------
+Dialogue:
+    'Dialogue' name=ID
+        'on:' onTrigger+=[Trigger|FQN|^triggers][',']
+        'responses:' responses+=Response[',']
+    'end'
+;
+
+Response: ActionGroup | Form;
+
+Form:
+    'Form' name=ID
+        params+=FormParam
+    'end'
+;
+
+FormParam:
+    name=ID ':' type=ParameterTypeDef '=' source=FormParamSource
+;
+
+FormParamRef: param=[FormParam|FQN|^dialogues*.responses.params];
+FormParamIndex: FormParamRef('['ID('.'ID)*']')?;
+
+FormParamSource: HRIParamSource | EServiceParamSource;
+
+HRIParamSource:
+    'HRI' '(' askSlot+=Text (',' '['extract+=ExtractionSource[','] ']')? ')'
+;
+
+ExtractionSource: ExtractFromEntity | ExtractFromIntent;
+ExtractFromIntent: intent=[Trigger|FQN|^triggers*] ':' value=ParameterValue;
+/* ExtractFromEntity: entity=[Entity|FQN|^entities*]; */
+ExtractFromEntity: TrainableEntityRef | PretrainedEntityRef;
+
+// EService -------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+EServiceDef: EServiceDefHTTP;
+
+EServiceDefHTTP:
+    'EServiceHTTP' name=ID
+        (  'verb:' verb=HTTPVerb
+          'host:' host=STRING
+          ('port:' port=INT)?
+          ('path:' path=STRING)?
+          ('mime:' mime*=STRING[','])?
+        )#
+    'end'
+;
+
+EServiceParamSource: EServiceCallHTTP;
+
+EServiceCallHTTP:
+    eserviceRef=[EServiceDef|FQN|eservices]'('
+        (
+        ('query=' '[' query_params*=EServiceParam[','] ']' ',')?
+        ('header=' '[' header_params*=EServiceParam[','] ']' ',')?
+        ('path=' '[' path_params*=EServiceParam[','] ']' ',')?
+        ('body=' '[' body_params*=EServiceParam[','] ']' ',')?
+        )#
+    ')' ('[' response_filter=EServiceResponseFilter ']')? ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+EServiceParam: name=ID '=' value=ParameterValue;
+
+ParameterValue:
+    INT                 |
+    FLOAT               |
+    STRING              |
+    BOOL                |
+    List                |
+    Dict                |
+    EnvPropertyDef		|
+    FormParamIndex      |
+    GlobalSlotIndex     |
+	Text
+;
+
+ParameterTypeDef:
+    'int'   |
+    'float' |
+    'str'   |
+    'bool'  |
+    'list'  |
+    'dict'
+;
+
+EServiceResponseFilter: EServiceResponseElement('.'EServiceResponseElement)*;
+
+EServiceResponseElement: ID | INT;
+// ----------------------------------------------------------------------
+
+// Global Slots ---------------------------------------------------------
+// ----------------------------------------------------------------------
+GlobalSlotValue: ParameterValue;
+GlobalSlotType: ParameterTypeDef;
+GlobalSlotRef: slot=[GlobalSlot|FQN|^gslots];
+GlobalSlotIndex: FormParamRef('['ID('.'ID)*']')?;
+
+GlobalSlot:
+    name=ID ':' type=GlobalSlotType ('=' default=GlobalSlotValue)?
+;
+// ----------------------------------------------------------------------
+
+// ACTIONS --------------------------------------------------------------
+// ----------------------------------------------------------------------
+ActionGroup:
+    'ActionGroup' name=ID
+        actions+=Action
+    'end'
+;
+
+Action:
+    SpeakAction     |
+    FireEventAction |
+    RESTCallAction  |
+    SetFormSlot     |
+    SetGlobalSlot
+;
+
+SpeakAction:
+    'Speak' '(' text+=Text ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetFormSlot:
+    'SetFSlot' '(' slotRef=FormParamRef ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetGlobalSlot:
+    'SetGSlot' '(' slotRef=GlobalSlotRef ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+FireEventAction:
+    'FireEvent' '(' uri+=Text ',' msg=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+RESTCallAction: EServiceCallHTTP;
+// ----------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------
+
+// GENERAL --------------------------------------------------------------
+// ----------------------------------------------------------------------
+HTTPVerb:
+    'GET'   |
+    'POST'  |
+    'PUT'
+;
+
+EnvPropertyDef: UserPropertyDef | SystemPropertyDef;
+UserPropertyDef: 'USER:' property=[UserProperty|FQN];
+SystemPropertyDef: 'SYSTEM:' property=[SystemProperty|FQN];
+
+UserProperty:
+    'NAME'      |
+    'SURNAME'   |
+    'AGE'       |
+    'EMAIL'     |
+    'PHONE'		|
+    'CITY'		|
+    'ADDRESS'
+;
+
+SystemProperty:
+	'TIME'			|
+	'LOCATION'		|
+	'RANDOM_INT'	|
+	'RANDOM_FLOAT'  |
+    'HOSTNAME'      |
+    'PUBLIC_IP'     |
+    'USER_EXPRESSION'
+;
+
+// TYPES
+
+DictItem:
+    name=ID ':' value=DictType
+;
+
+DictType:
+    NUMBER | STRING | BOOL | Dict | List | FormParamIndex | GlobalSlotIndex
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+List:
+    '[' items*=ListElement[','] ']'
+;
+
+ListElement:
+    NUMBER | STRING | BOOL | List | Dict | FormParamIndex | GlobalSlotIndex
+;
+
+
+Text: STRING | EnvPropertyDef | FormParamIndex | GlobalSlotIndex;

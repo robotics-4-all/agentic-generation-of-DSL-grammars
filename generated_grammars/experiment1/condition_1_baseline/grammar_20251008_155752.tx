@@ -1,0 +1,233 @@
+SmartEnvironmentModel:
+    imports*=ImportStm
+    metadata=Metadata
+    brokers*=BrokerDef
+    authentications*=AuthenticationDef
+    entities*=EntityDef
+    automations*=AutomationDef
+;
+
+ImportStm:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+        ('basePath:' basePath=STRING)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+AuthenticationDef:
+    UsernamePasswordAuth | TokenAuth | CertificateAuth
+;
+
+UsernamePasswordAuth:
+    'Auth<UserPass>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerDef])
+        ('topic:' topic=STRING)?
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'timestamp' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+BehaviorDef:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=STRING)
+        ('action:' action=STRING)
+        ('parameters:' '-' parameters*=ParameterDef['-'])?
+    )#
+    'end'
+;
+
+ParameterDef:
+    name=ID ':' value=PropertyValue
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('priority:' priority=INT)?
+        ('conditions:' '-' conditions*=ConditionDef['-'])
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('schedule:' schedule=ScheduleDef)?
+    )#
+    'end'
+;
+
+ConditionDef:
+    SimpleCondition | CompositeCondition
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+CompositeCondition:
+    '(' left=ConditionDef operator=LogicalOperator right=ConditionDef ')'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction
+;
+
+EntityAction:
+    'action' target=[EntityDef] '.' method=ID ('(' parameters*=ActionParameter[','] ')')?
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' recipients*=STRING[','])?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ActionParameter:
+    name=ID '=' value=PropertyValue
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ScheduleDef:
+    'schedule'
+    (
+        ('start:' startTime=STRING)?
+        ('end:' endTime=STRING)?
+        ('repeat:' repeatInterval=RepeatInterval)?
+        ('days:' days*=DayOfWeek[','])?
+    )#
+    'end'
+;
+
+RepeatInterval:
+    'once' | 'daily' | 'weekly' | 'monthly' | 'custom'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

@@ -1,0 +1,209 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentications*=Authentication
+        entities*=Entity
+        conditions*=Condition
+        actions*=Action
+        automations*=Automation
+    )#
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+PropertyType:
+    'str' | 'float' | 'int' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | '[' values*=PropertyValue[','] ']'
+;
+
+Property:
+    name=ID ':' type=PropertyType ('=' default=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action=[Action]
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'startsWith' | 'endsWith'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!' | 'xor'
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+ConditionOperand:
+    EntityPropertyRef | PropertyValue
+;
+
+SimpleCondition:
+    left=ConditionOperand operator=ComparisonOperator right=ConditionOperand
+;
+
+ConditionExpression:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+ActionType:
+    'set' | 'get' | 'toggle' | 'send' | 'notify' | 'execute'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+TimeTrigger:
+    'Time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'Event' '(' event=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] '.' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[Broker])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=STRING)?
+    )#
+    'end'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+    )#
+    'end'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' type=ActionType)
+        ('target:' target=[Entity])
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('condition:' condition=[Condition])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

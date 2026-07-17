@@ -1,0 +1,205 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('location:' location=LocationSpec)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+PropertyDefinition:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDefinition:
+    name=ID ':' action=ActionDefinition
+;
+
+LocationSpec:
+    'Location' '(' x=FLOAT ',' y=FLOAT (',' z=FLOAT)? ')'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' '-' conditions*=ConditionSpec['-'])?
+        ('actions:' '-' actions*=ActionDefinition['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+TriggerCondition:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityTrigger:
+    'EntityTrigger' entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'TimeTrigger' schedule=ScheduleSpec
+;
+
+EventTrigger:
+    'EventTrigger' event=STRING
+;
+
+ScheduleSpec:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+ConditionSpec:
+    SimpleCondition (logicalOp=LogicalOperator right=SimpleCondition)*
+;
+
+SimpleCondition:
+    entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionDefinition:
+    EntityAction | NotificationAction | ScriptAction
+;
+
+EntityAction:
+    'EntityAction' entity=[EntityDefinition] '.' property=ID value=PropertyValue
+;
+
+NotificationAction:
+    'NotificationAction' message=STRING target=STRING
+;
+
+ScriptAction:
+    'ScriptAction' script=STRING language=ScriptLanguage
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash'
+;

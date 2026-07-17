@@ -1,0 +1,281 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=Broker)*
+    (authentications*=Authentication)*
+    (entities*=Entity)*
+    (automations*=Automation)*
+    (conditions*=Condition)*
+    (actions*=Action)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[Authentication])?
+        ('topics:' '-' topics*=STRING['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    TokenAuth | BasicAuth | CertificateAuth
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=AuthTokenType)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthTokenType:
+    'Bearer' | 'API' | 'Custom'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('datatype:' datatype=DataType)
+        ('value:' value=PropertyValue)?
+        ('readonly:' readonly=BOOL)?
+        ('unit:' unit=STRING)?
+    )#
+    'end'
+;
+
+DataType:
+    'string' | 'integer' | 'float' | 'boolean' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('action:' action=[Action])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+BehaviorTrigger:
+    'property_change' | 'time_based' | 'event' | 'external'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    EventTrigger | TimeTrigger | PropertyTrigger
+;
+
+EventTrigger:
+    'Event' '(' event_name=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+PropertyTrigger:
+    'Property' '(' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionTerm:
+    SimpleCondition | '(' expression=ConditionExpression ')'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID comparison=ComparisonOperator value=PropertyValue
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry:' retry=RetryPolicy)?
+    )#
+    'end'
+;
+
+ActionType:
+    'device_control' | 'notification' | 'data_operation' | 'system_command'
+;
+
+ActionTarget:
+    EntityTarget | ExternalTarget
+;
+
+EntityTarget:
+    'entity' '(' entity=[Entity] ')'
+;
+
+ExternalTarget:
+    'external' '(' endpoint=STRING ')'
+;
+
+ActionParameter:
+    'Parameter' name=ID
+    (
+        ('value:' value=ParameterValue)
+        ('type:' param_type=DataType)?
+    )#
+    'end'
+;
+
+ParameterValue:
+    PropertyValue | EntityReference
+;
+
+EntityReference:
+    entity=[Entity] '.' property=ID
+;
+
+RetryPolicy:
+    'RetryPolicy'
+    (
+        ('max_attempts:' max_attempts=INT)
+        ('delay:' delay=INT)?
+        ('backoff:' backoff=BOOL)?
+    )#
+    'end'
+;

@@ -1,0 +1,228 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('basepath:' basepath=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certfile:' certfile=STRING)
+        ('keyfile:' keyfile=STRING)?
+        ('cafile:' cafile=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' defaultvalue=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response' | 'execute'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical=LogicalOperator right=SimpleCondition)*
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction ('when' condition=Condition)?
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] ',' event=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'startswith' | 'endswith'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+Parameter:
+    name=ID ':' value=PropertyValue
+;
+
+ActionParameters:
+    '{' params*=Parameter[','] '}'
+;
+
+NotificationMethod:
+    'email' | 'sms' | 'push' | 'webhook'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+PublishAction:
+    'Publish' '(' broker=[Broker] ',' topic=STRING ',' message=STRING ')'
+;
+
+ControlAction:
+    'Control' '(' entity=[Entity] ',' command=STRING ',' parameters=ActionParameters? ')'
+;
+
+NotifyAction:
+    'Notify' '(' recipient=STRING ',' message=STRING ',' method=NotificationMethod ')'
+;
+
+ServiceAction:
+    'Service' '(' url=STRING ',' method=HTTPMethod ',' data=STRING? ')'
+;
+
+Action:
+    PublishAction | ControlAction | NotifyAction | ServiceAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

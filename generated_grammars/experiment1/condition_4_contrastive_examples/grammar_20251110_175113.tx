@@ -1,0 +1,211 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth_mechanisms*=AuthMechanism  
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+HTTPHeader:
+    key=STRING ':' value=STRING
+;
+
+ServiceParam:
+    name=ID '=' value=PropertyValue
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'system'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>='
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+AuthMechanism:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('virtual_host:' virtual_host=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('timeout:' timeout=INT)?
+        ('headers:' headers*=HTTPHeader)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+TriggerCondition:
+    'on_change' | 'on_value' value=PropertyValue | 'on_schedule' schedule=STRING
+;
+
+BehaviorDef:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('actions:' actions*=ActionDef)
+    )#
+    'end'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('location:' location=STRING)?
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+    )#
+    'end'
+;
+
+PropertyReference:
+    entity=[EntityDef] '.' property=ID
+;
+
+ComparisonCondition:
+    property=PropertyReference operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=STRING
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition
+;
+
+ConditionSpec:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+ExecutionControl:
+    'execution'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+SetValueAction:
+    'set' target=PropertyReference 'to' value=PropertyValue
+;
+
+SendMessageAction:
+    'send' message=STRING 'to' broker=[BrokerConfig]
+;
+
+CallServiceAction:
+    'call' service_name=STRING '(' params*=ServiceParam ')'
+;
+
+ActionDef:
+    SetValueAction | SendMessageAction | CallServiceAction
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions*=ConditionSpec)
+        ('actions:' actions*=ActionDef)
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

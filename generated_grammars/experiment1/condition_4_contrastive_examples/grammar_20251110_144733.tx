@@ -1,0 +1,416 @@
+SmartEnvironmentModel:
+    (
+        imports*=Import
+        metadata=Metadata?
+        brokers*=Broker
+        authMechanisms*=AuthMechanism
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+        ('modified:' modified=STRING)?
+    )#
+    'end'
+;
+
+AuthMechanism:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+        ('header:' headerName=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certFile:' certFile=STRING)
+        ('keyFile:' keyFile=STRING)
+        ('caFile:' caFile=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=APIKeyLocation)
+        ('name:' paramName=STRING)?
+    )#
+    'end'
+;
+
+APIKeyLocation:
+    'header' | 'query' | 'cookie'
+;
+
+Header:
+    name=STRING ':' value=STRING
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('clientId:' clientId=STRING)?
+        ('keepAlive:' keepAlive=INT)?
+        ('cleanSession:' cleanSession=BOOL)?
+        ('ssl:' ssl=BOOL)?
+        ('topics:' '-' topics*=STRING['-'])?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('routingKey:' routingKey=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('headers:' '-' headers*=Header['-'])?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+SensorType:
+    'temperature' | 'humidity' | 'pressure' | 'light' | 'motion' | 'door' | 'window' | 'smoke' | 'gas' | 'water' | 'sound' | 'vibration' | 'magnetic' | 'other'
+;
+
+ActuatorType:
+    'switch' | 'dimmer' | 'thermostat' | 'lock' | 'valve' | 'motor' | 'speaker' | 'display' | 'led' | 'relay' | 'servo' | 'other'
+;
+
+PropertyType:
+    'string' | 'number' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    NUMBER | STRING | BOOL | Array | Object
+;
+
+Array:
+    '[' items*=PropertyValue[','] ']'
+;
+
+Object:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    name=STRING ':' value=PropertyValue
+;
+
+Property:
+    name=ID ':' type=PropertyType ('=' defaultValue=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' implementation=STRING
+;
+
+Entity:
+    Sensor | Actuator | Device | Room | Zone
+;
+
+Sensor:
+    'Entity<Sensor>' name=ID
+    (
+        ('type:' sensorType=SensorType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('unit:' unit=STRING)?
+        ('minValue:' minValue=NUMBER)?
+        ('maxValue:' maxValue=NUMBER)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+Actuator:
+    'Entity<Actuator>' name=ID
+    (
+        ('type:' actuatorType=ActuatorType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])
+        ('commandTopic:' commandTopic=STRING)?
+        ('statusTopic:' statusTopic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+Device:
+    'Entity<Device>' name=ID
+    (
+        ('type:' deviceType=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])
+        ('capabilities:' '-' capabilities*=STRING['-'])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+Room:
+    'Entity<Room>' name=ID
+    (
+        ('type:' roomType=STRING)
+        ('area:' area=NUMBER)?
+        ('floor:' floor=INT)?
+        ('entities:' '-' entities*=[Entity]['-'])?
+        ('properties:' '-' properties*=Property['-'])?
+    )#
+    'end'
+;
+
+Zone:
+    'Entity<Zone>' name=ID
+    (
+        ('type:' zoneType=STRING)
+        ('description:' description=STRING)?
+        ('rooms:' '-' rooms*=[Room]['-'])?
+        ('entities:' '-' entities*=[Entity]['-'])?
+        ('properties:' '-' properties*=Property['-'])?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'contains' | 'in' | 'regex'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook' | 'mqtt'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+TimeUnit:
+    'milliseconds' | 'seconds' | 'minutes' | 'hours'
+;
+
+Condition:
+    SimpleCondition | ComplexCondition
+;
+
+SimpleCondition:
+    'Condition<Simple>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+        ('negate:' negate=BOOL)?
+    )#
+    'end'
+;
+
+ComplexCondition:
+    'Condition<Complex>' name=ID
+    (
+        ('operator:' operator=LogicalOperator)
+        ('conditions:' '-' conditions*=[Condition]['-'])
+        ('negate:' negate=BOOL)?
+    )#
+    'end'
+;
+
+RepeatConfig:
+    'RepeatConfig'
+    (
+        ('times:' times=INT)
+        ('interval:' interval=INT)?
+        ('until:' until=[Condition])?
+    )#
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('repeat:' repeat=RepeatConfig)?
+        ('timeout:' timeout=INT)?
+    )#
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'Trigger<Time>' 
+    (
+        ('schedule:' schedule=STRING)
+        ('timezone:' timezone=STRING)?
+    )#
+;
+
+EventTrigger:
+    'Trigger<Event>'
+    (
+        ('entity:' entity=[Entity])
+        ('event:' event=STRING)
+        ('value:' value=PropertyValue)?
+    )#
+;
+
+StateTrigger:
+    'Trigger<State>'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+        ('duration:' duration=INT)?
+    )#
+;
+
+TransitionConfig:
+    'TransitionConfig'
+    (
+        ('duration:' duration=INT)
+        ('easing:' easing=STRING)?
+    )#
+;
+
+Parameter:
+    name=STRING ':' value=PropertyValue
+;
+
+Action:
+    SetAction | CallAction | NotifyAction | DelayAction | ScriptAction
+;
+
+SetAction:
+    'Action<Set>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+        ('transition:' transition=TransitionConfig)?
+    )#
+    'end'
+;
+
+CallAction:
+    'Action<Call>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('method:' method=STRING)
+        ('parameters:' '-' parameters*=Parameter['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+NotifyAction:
+    'Action<Notify>' name=ID
+    (
+        ('recipient:' recipient=STRING)
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'Action<Delay>' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+ScriptAction:
+    'Action<Script>' name=ID
+    (
+        ('language:' language=STRING)
+        ('code:' code=STRING)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('description:' description=STRING)?
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('triggers:' '-' triggers*=Trigger['-'])
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

@@ -1,0 +1,241 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        brokers*=BrokerConfiguration
+        auth_mechanisms*=AuthenticationMechanism
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+        conditions*=ConditionSpecification
+        actions*=ActionDefinition
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system_id:' system_id=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+PropertyType:
+    'str' | 'int' | 'float' | 'bool' | 'json'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+EntityProperty:
+    name=ID ':' prop_type=PropertyType ('=' default_value=PropertyValue)?
+;
+
+BehaviorTrigger:
+    'property_change' | 'timer' | 'external_event'
+;
+
+EntityBehavior:
+    'behavior' name=ID 'on:' trigger=BehaviorTrigger
+;
+
+AuthenticationMechanism:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfiguration:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('base_path:' base_path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])?
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('broker:' broker=[BrokerConfiguration])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'once'
+;
+
+AutomationTrigger:
+    PropertyTrigger | TimeTrigger | EventTrigger
+;
+
+PropertyTrigger:
+    'property_change' entity=[EntityDefinition] '.' property=ID
+;
+
+TimeTrigger:
+    'timer' interval=INT unit=TimeUnit
+;
+
+EventTrigger:
+    'event' event_name=STRING
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[ConditionSpecification]['-'])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('execution_mode:' exec_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+PropertyCondition:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+ComparisonValue:
+    STRING | FLOAT | INT | BOOL | PropertyCondition
+;
+
+ComparisonCondition:
+    left=PropertyCondition operator=ComparisonOperator right=ComparisonValue
+;
+
+GroupedCondition:
+    '(' expression=ConditionalExpression ')'
+;
+
+ConditionTerm:
+    ComparisonCondition | PropertyCondition | GroupedCondition
+;
+
+ConditionalExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notify' | 'log' | 'trigger_automation'
+;
+
+EntityReference:
+    entity=[EntityDefinition] ('.' property=ID)?
+;
+
+ActionValue:
+    STRING | FLOAT | INT | BOOL | EntityReference
+;
+
+ActionParameter:
+    name=ID ':' value=ActionValue
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[EntityDefinition])?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

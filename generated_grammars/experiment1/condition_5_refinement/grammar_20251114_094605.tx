@@ -1,0 +1,214 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (entities*=Entity)
+        (automations*=Automation)
+        (conditions*=Condition)
+        (actions*=Action)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('baseTopic:' baseTopic=STRING)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('port:' port=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+Authentication:
+    UsernamePasswordAuth | TokenAuth | CertificateAuth
+;
+
+UsernamePasswordAuth:
+    'username:' username=STRING 'password:' password=STRING
+;
+
+TokenAuth:
+    'token:' token=STRING
+;
+
+CertificateAuth:
+    'certificate:' certificate=STRING 'key:' key=STRING
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])?
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+EntityProperty:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+EntityBehavior:
+    name=ID ':' behaviorType=BehaviorType
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'on_demand' | 'continuous'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('condition:' condition=[Condition])?
+        ('action:' action=[Action])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'event' '(' entity=[Entity] ',' event=STRING ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[Entity] ',' property=ID ',' value=PropertyValue ')'
+;
+
+TimeSchedule:
+    CronExpression | TimeInterval
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+TimeInterval:
+    'interval' '(' seconds=INT ')'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ComparisonExpression:
+    left=PropertyReference comparator=ComparisonOperator right=ComparisonValue
+    | '(' expression=LogicalExpression ')'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+ComparisonValue:
+    PropertyReference | PropertyValue
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActionType:
+    'command' | 'notification' | 'data_request' | 'configuration'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;

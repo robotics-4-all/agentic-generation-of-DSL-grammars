@@ -1,0 +1,237 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        auth*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' seconds=INT
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+PropertyTrigger:
+    'OnProperty' property=[Property] operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'OnTime' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'OnEvent' event_name=STRING
+;
+
+Trigger:
+    PropertyTrigger | TimeTrigger | EventTrigger
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('actions:' '-' actions*=Action['-'])
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=STRING
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+Operand:
+    PropertyValue | PropertyReference
+;
+
+ValueCondition:
+    left_operand=Operand operator=ComparisonOperator right_operand=Operand
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Condition:
+    left=SimpleCondition (logical_operator=LogicalOperator right=SimpleCondition)*
+;
+
+Parameter:
+    name=ID '=' value=PropertyValue
+;
+
+ParameterList:
+    parameters*=Parameter[',']
+;
+
+SetPropertyAction:
+    'SetProperty' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+SendMessageAction:
+    'SendMessage' broker=[Broker] message=STRING
+;
+
+CallServiceAction:
+    'CallService' service_name=STRING ('(' parameters=ParameterList ')')?
+;
+
+WaitAction:
+    'Wait' duration=INT 'seconds'
+;
+
+Action:
+    SetPropertyAction | SendMessageAction | CallServiceAction | WaitAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' condition=Condition)
+        ('actions:' '-' actions*=Action['-'])
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;

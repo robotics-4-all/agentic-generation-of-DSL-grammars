@@ -1,0 +1,342 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=Broker)*
+    (authentications*=Authentication)*
+    (entities*=Entity)*
+    (automations*=Automation)*
+    (conditions*=Condition)*
+    (actions*=Action)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=QoSLevel)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+QoSLevel:
+    '0' | '1' | '2'
+;
+
+Authentication:
+    TokenAuth | BasicAuth | CertAuth
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' authType=TokenType)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+TokenType:
+    'Bearer' | 'API' | 'Custom'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('dataType:' dataType=DataType)
+        ('value:' value=PropertyValue)?
+        ('unit:' unit=STRING)?
+        ('access:' access=AccessType)?
+        ('range:' range=ValueRange)?
+    )#
+    'end'
+;
+
+DataType:
+    'string' | 'integer' | 'float' | 'boolean' | 'object' | 'array'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+AccessType:
+    'read' | 'write' | 'readwrite'
+;
+
+ValueRange:
+    'Range' '(' min=NUMBER ',' max=NUMBER ')'
+;
+
+Capability:
+    'Capability' name=ID
+    (
+        ('description:' description=STRING)?
+        ('parameters:' '-' parameters*=Parameter['-'])?
+        ('endpoint:' endpoint=STRING)?
+    )#
+    'end'
+;
+
+Parameter:
+    'Parameter' name=ID
+    (
+        ('type:' paramType=DataType)
+        ('required:' required=BOOL)?
+        ('default:' defaultValue=PropertyValue)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('description:' description=STRING)?
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'Trigger<Time>'
+    (
+        ('schedule:' schedule=CronExpression)
+        ('timezone:' timezone=STRING)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'Trigger<Event>'
+    (
+        ('entity:' entity=[Entity])
+        ('event:' eventType=STRING)
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+StateTrigger:
+    'Trigger<State>'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=[Property])
+        ('condition:' condition=[Condition])
+    )#
+    'end'
+;
+
+CronExpression:
+    STRING
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('description:' description=STRING)?
+        ('expression:' expression=LogicalExpression)
+    )#
+    'end'
+;
+
+LogicalExpression:
+    OrExpression
+;
+
+OrExpression:
+    left=AndExpression ('or' right=AndExpression)*
+;
+
+AndExpression:
+    left=NotExpression ('and' right=NotExpression)*
+;
+
+NotExpression:
+    ('not')? expr=ComparisonExpression
+;
+
+ComparisonExpression:
+    left=ValueExpression (operator=ComparisonOperator right=ValueExpression)?
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+ValueExpression:
+    EntityPropertyRef | LiteralValue | '(' LogicalExpression ')'
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=[Property]
+;
+
+LiteralValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+Action:
+    DeviceAction | NotificationAction | DataAction | ServiceAction
+;
+
+DeviceAction:
+    'Action<Device>' name=ID
+    (
+        ('description:' description=STRING)?
+        ('target:' target=[Entity])
+        ('capability:' capability=[Capability])
+        ('parameters:' parameters=ParameterList)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('description:' description=STRING)?
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('recipients:' recipients=STRING)?
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+DataAction:
+    'Action<Data>' name=ID
+    (
+        ('description:' description=STRING)?
+        ('operation:' operation=DataOperation)
+        ('target:' target=STRING)
+        ('data:' data=STRING)?
+    )#
+    'end'
+;
+
+ServiceAction:
+    'Action<Service>' name=ID
+    (
+        ('description:' description=STRING)?
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('payload:' payload=STRING)?
+        ('headers:' headers=STRING)?
+    )#
+    'end'
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook' | 'mqtt'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+DataOperation:
+    'store' | 'retrieve' | 'update' | 'delete' | 'aggregate'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ParameterList:
+    '{' items*=ParameterItem[','] '}'
+;
+
+ParameterItem:
+    name=STRING ':' value=PropertyValue
+;

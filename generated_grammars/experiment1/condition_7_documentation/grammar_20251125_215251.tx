@@ -1,0 +1,229 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'dimmer' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorType:
+    'readonly' | 'writeonly' | 'readwrite' | 'event'
+;
+
+Behavior:
+    name=ID ':' behaviorType=BehaviorType
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+PropertyCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=ConditionValue
+;
+
+TimeCondition:
+    'time' operator=TimeOperator value=TimeValue
+;
+
+StateCondition:
+    entity=[Entity] 'is' state=STRING
+;
+
+Condition:
+    PropertyCondition | TimeCondition | StateCondition
+;
+
+ConditionGroup:
+    '(' expr=ConditionExpression ')' | condition=Condition
+;
+
+ConditionExpression:
+    left=ConditionGroup (operator=LogicalOperator right=ConditionGroup)*
+;
+
+ConditionValue:
+    STRING | FLOAT | INT | BOOL | entity=[Entity] '.' property=ID
+;
+
+TimeValue:
+    time=TIME | entity=[Entity] '.' property=ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startswith' | 'endswith'
+;
+
+TimeOperator:
+    'after' | 'before' | 'at' | 'between'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SetAction:
+    'Set' entity=[Entity] '.' property=ID '=' value=ActionValue
+;
+
+CallAction:
+    'Call' entity=[Entity] '.' behavior=ID ('(' parameters=ActionParameters ')')?
+;
+
+NotifyAction:
+    'Notify' message=STRING ('to' recipients*=STRING[','])?
+;
+
+DelayAction:
+    'Delay' duration=INT timeUnit=TimeUnit
+;
+
+Action:
+    SetAction | CallAction | NotifyAction | DelayAction
+;
+
+ActionValue:
+    STRING | FLOAT | INT | BOOL | entity=[Entity] '.' property=ID
+;
+
+Parameter:
+    name=ID '=' value=ActionValue
+;
+
+ActionParameters:
+    parameters*=Parameter[',']
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' conditions=ConditionExpression)
+        ('actions:' '-' actions*=Action['-'])
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TIME:
+    /([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/
+;

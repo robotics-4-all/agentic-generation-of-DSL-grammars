@@ -1,0 +1,227 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'room' | 'zone' | 'system'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TIME:
+    /\d{2}:\d{2}(:\d{2})?/
+;
+
+TimeSchedule:
+    'at' time=TIME | 'every' interval=INT unit=TimeUnit
+;
+
+TriggerCondition:
+    condition=[Condition] | timeSchedule=TimeSchedule
+;
+
+Behavior:
+    name=ID ':' action=[Action] ('when' trigger=TriggerCondition)?
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+AuthPlain:
+    'AuthPlain' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+AuthApiKey:
+    'AuthApiKey' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+AuthCert:
+    'AuthCert' name=ID
+    (
+        ('cert:' cert=STRING)?
+        ('certPath:' certPath=STRING)?
+        ('keyPath:' keyPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    AuthPlain | AuthApiKey | AuthCert
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('webPath:' webPath=STRING)?
+        ('webPort:' webPort=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('topicExchange:' topicExchange=STRING)?
+        ('rpcExchange:' rpcExchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EventTrigger:
+    'event' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+StateTrigger:
+    'state' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+AutomationTrigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('mode:' mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonExpression:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set' | 'toggle' | 'notify' | 'execute' | 'wait' | 'log'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;

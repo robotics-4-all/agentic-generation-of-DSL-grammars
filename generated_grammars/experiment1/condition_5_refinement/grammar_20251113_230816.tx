@@ -1,0 +1,209 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ActionType:
+    'read' | 'write' | 'execute' | 'subscribe' | 'publish'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action_type=ActionType
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('base_path:' base_path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[Broker])
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+TimeBasedTrigger:
+    'TimeTrigger' '(' schedule=STRING ')'
+;
+
+EventBasedTrigger:
+    'EventTrigger' '(' entity=[Entity] ',' event_type=STRING ')'
+;
+
+StateChangeTrigger:
+    'StateTrigger' '(' entity=[Entity] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+TriggerCondition:
+    TimeBasedTrigger | EventBasedTrigger | StateChangeTrigger
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_operator=LogicalOperator right=SimpleCondition)*
+;
+
+ActionParameters:
+    '{' params*=ActionParameter[','] '}'
+;
+
+ActionParameter:
+    name=STRING ':' value=PropertyValue
+;
+
+EntityAction:
+    'EntityAction' '(' entity=[Entity] ',' operation=STRING (',' parameters=ActionParameters)? ')'
+;
+
+NotificationAction:
+    'NotificationAction' '(' message=STRING ',' recipients*=STRING[','] ')'
+;
+
+ScriptAction:
+    'ScriptAction' '(' script_path=STRING (',' parameters=ActionParameters)? ')'
+;
+
+Action:
+    EntityAction | NotificationAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;

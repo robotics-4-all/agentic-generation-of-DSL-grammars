@@ -1,0 +1,190 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    PlainAuth | ApiKeyAuth | CertAuth
+;
+
+PlainAuth:
+    'Authentication' name=ID
+    (
+        ('type:' type='plain')
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Authentication' name=ID
+    (
+        ('type:' type='apikey')
+        ('key:' key=STRING)
+    )#
+    'end'
+;
+
+CertAuth:
+    'Authentication' name=ID
+    (
+        ('type:' type='cert')
+        ('cert:' cert=STRING)
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'list' | 'dict'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('broker:' broker=[Broker])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+ConditionOperand:
+    PropertyReference | LiteralValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    left=ConditionOperand operator=ComparisonOperator right=ConditionOperand
+;
+
+Condition:
+    left=SimpleCondition (logicalOp=LogicalOperator right=SimpleCondition)*
+;
+
+ServiceParam:
+    name=ID ':' value=PropertyValue
+;
+
+ServiceParameters:
+    '{' params*=ServiceParam[','] '}'
+;
+
+Action:
+    SetPropertyAction | PublishAction | CallServiceAction
+;
+
+SetPropertyAction:
+    'SetProperty' '(' target=PropertyReference ',' value=PropertyValue ')'
+;
+
+PublishAction:
+    'Publish' '(' topic=STRING ',' message=PropertyValue ')'
+;
+
+CallServiceAction:
+    'CallService' '(' service=STRING ',' parameters=ServiceParameters? ')'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Condition)
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

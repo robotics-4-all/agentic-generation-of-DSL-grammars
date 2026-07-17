@@ -1,0 +1,206 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+PlainAuth:
+    'Auth<Plain>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    PlainAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response' | 'notify'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+PropertyCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator timeValue=TimeValue
+;
+
+PrimitiveCondition:
+    PropertyCondition | TimeCondition
+;
+
+Condition:
+    left=PrimitiveCondition (logicOp=LogicalOperator right=PrimitiveCondition)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours'
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction
+;
+
+ScheduleUnit:
+    'second' | 'minute' | 'hour' | 'day' | 'week'
+;
+
+Schedule:
+    'every' interval=INT unit=ScheduleUnit ('at' time=TimeValue)?
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Condition)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('schedule:' schedule=Schedule)?
+    )#
+    'end'
+;

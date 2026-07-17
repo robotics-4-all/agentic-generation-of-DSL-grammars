@@ -1,0 +1,216 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderPair:
+    key=STRING ':' value=STRING
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'async'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers*=HeaderPair)*
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+BehaviorDef:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('actions:' actions*=ActionDef)*
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' properties*=PropertyDef)*
+        ('behaviors:' behaviors*=BehaviorDef)*
+        ('broker:' broker=[BrokerConfig])?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'Event' ':' event_name=STRING
+;
+
+TimeTrigger:
+    'Time' ':' schedule=STRING
+;
+
+PropertyTrigger:
+    'Property' ':' entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TriggerDef:
+    EventTrigger | TimeTrigger | PropertyTrigger
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ComplexCondition:
+    '(' left=ConditionDef logical_op=LogicalOperator right=ConditionDef ')'
+;
+
+ConditionDef:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+SetPropertyAction:
+    'SetProperty' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+SendMessageAction:
+    'SendMessage' broker=[BrokerConfig] ':' message=STRING
+;
+
+CallServiceAction:
+    'CallService' url=STRING ('with' payload=STRING)?
+;
+
+ActionDef:
+    SetPropertyAction | SendMessageAction | CallServiceAction
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions*=ConditionDef)*
+        ('actions:' actions*=ActionDef)*
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

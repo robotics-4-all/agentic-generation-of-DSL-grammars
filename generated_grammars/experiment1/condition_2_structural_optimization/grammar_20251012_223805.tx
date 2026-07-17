@@ -1,0 +1,238 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentications*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderList:
+    '[' headers*=Header[','] ']'
+;
+
+Header:
+    key=STRING ':' value=STRING
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' api_key=STRING)
+        ('header:' header_name=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=HeaderList)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+PropertyList:
+    '[' properties*=Property[','] ']'
+;
+
+Behavior:
+    name=ID ':' action=STRING
+;
+
+BehaviorList:
+    '[' behaviors*=Behavior[','] ']'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('broker:' broker=[Broker])?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+LogicalOperator:
+    'AND' | 'OR' | 'NOT'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+ComparisonCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=TimeValue
+;
+
+Parameter:
+    name=ID '=' value=PropertyValue
+;
+
+ParameterList:
+    '[' parameters*=Parameter[','] ']'
+;
+
+EventCondition:
+    'event' '(' event_name=STRING (',' parameters=ParameterList)? ')'
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | EventCondition
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' channel=STRING)? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT ')'
+;
+
+ScriptAction:
+    'script' '(' script_path=STRING (',' parameters=ParameterList)? ')'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+ActionList:
+    '[' actions*=Action[','] ']'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=Condition)
+        ('actions:' actions=ActionList)
+        ('execution_mode:' execution_mode=ExecutionMode)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

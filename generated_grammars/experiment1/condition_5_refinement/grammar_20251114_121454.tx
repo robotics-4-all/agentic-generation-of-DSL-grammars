@@ -1,0 +1,404 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDefinition
+        conditions*=ConditionDefinition
+        actions*=ActionDefinition
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+HeaderProperty:
+    name=STRING ':' value=STRING
+;
+
+KeyLocation:
+    'header' | 'query' | 'body'
+;
+
+StorageType:
+    'database' | 'file_system' | 'cloud' | 'memory' | 'time_series'
+;
+
+PropertyDataType:
+    'string' | 'int' | 'float' | 'bool' | 'datetime' | 'json' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+DataFormat:
+    'json' | 'xml' | 'csv' | 'binary' | 'protobuf' | 'avro'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'parallel' | 'sequential'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '>=' | '<' | '<=' | 'contains' | 'starts_with' | 'ends_with'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!' | 'xor'
+;
+
+TimeType:
+    'absolute' | 'relative' | 'cron' | 'interval'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+LocationType:
+    'point' | 'area' | 'zone' | 'proximity'
+;
+
+CoordinateSet:
+    '(' latitude=FLOAT ',' longitude=FLOAT ')'
+;
+
+NotificationType:
+    'email' | 'sms' | 'push' | 'webhook' | 'mqtt' | 'log'
+;
+
+NotificationPriority:
+    'low' | 'medium' | 'high' | 'critical'
+;
+
+DataOperation:
+    'read' | 'write' | 'update' | 'delete' | 'backup' | 'restore' | 'aggregate' | 'transform'
+;
+
+SystemOperation:
+    'start' | 'stop' | 'restart' | 'configure' | 'monitor' | 'log' | 'backup' | 'update'
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'reactive' | 'proactive' | 'adaptive'
+;
+
+BehaviorParam:
+    name=ID '=' value=PropertyValue
+;
+
+BehaviorParameters:
+    params*=BehaviorParam[',']
+;
+
+EntityProperty:
+    name=ID ':' data_type=PropertyDataType ('=' default_value=PropertyValue)?
+;
+
+EntityBehavior:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=BehaviorParameters ')')?
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+EnvironmentVariable:
+    name=ID ':' value=STRING
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('key_location:' key_location=KeyLocation)
+        ('key_name:' key_name=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('client_id:' client_id=STRING)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('virtual_host:' virtual_host=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('port:' port=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('headers:' '-' headers*=HeaderProperty['-'])?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+CoAPBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('confirmable:' confirmable=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker | CoAPBroker
+;
+
+SensorEntity:
+    'Entity<Sensor>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('data_format:' data_format=DataFormat)?
+        ('sampling_rate:' sampling_rate=FLOAT)?
+        ('unit:' unit=STRING)?
+        ('range:' '[' min_value=FLOAT ',' max_value=FLOAT ']')?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Entity<Actuator>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('broker:' broker=[BrokerConfig])
+        ('command_topic:' command_topic=STRING)
+        ('status_topic:' status_topic=STRING)?
+        ('data_format:' data_format=DataFormat)?
+        ('states:' '[' states*=STRING[','] ']')?
+        ('default_state:' default_state=STRING)?
+    )#
+    'end'
+;
+
+ComputeEntity:
+    'Entity<Compute>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('broker:' broker=[BrokerConfig])
+        ('input_topics:' '[' input_topics*=STRING[','] ']')
+        ('output_topics:' '[' output_topics*=STRING[','] ']')
+        ('processing_function:' processing_function=STRING)
+        ('memory_limit:' memory_limit=INT)?
+        ('cpu_limit:' cpu_limit=FLOAT)?
+    )#
+    'end'
+;
+
+StorageEntity:
+    'Entity<Storage>' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('storage_type:' storage_type=StorageType)
+        ('connection_string:' connection_string=STRING)
+        ('retention_policy:' retention_policy=STRING)?
+        ('capacity:' capacity=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    SensorEntity | ActuatorEntity | ComputeEntity | StorageEntity
+;
+
+SimpleCondition:
+    'Condition<Simple>' name=ID
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+        ('tolerance:' tolerance=FLOAT)?
+    )#
+    'end'
+;
+
+CompoundCondition:
+    'Condition<Compound>' name=ID
+    (
+        ('conditions:' '-' sub_conditions*=[ConditionDefinition]['-'])
+        ('logical_operator:' logical_operator=LogicalOperator)
+    )#
+    'end'
+;
+
+TimeCondition:
+    'Condition<Time>' name=ID
+    (
+        ('time_type:' time_type=TimeType)
+        ('time_value:' time_value=STRING)
+        ('days_of_week:' '[' days*=DayOfWeek[','] ']')?
+        ('timezone:' timezone=STRING)?
+    )#
+    'end'
+;
+
+LocationCondition:
+    'Condition<Location>' name=ID
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('location_type:' location_type=LocationType)
+        ('coordinates:' coordinates=CoordinateSet)?
+        ('radius:' radius=FLOAT)?
+        ('zone:' zone=STRING)?
+    )#
+    'end'
+;
+
+ConditionDefinition:
+    SimpleCondition | CompoundCondition | TimeCondition | LocationCondition
+;
+
+DeviceAction:
+    'Action<Device>' name=ID
+    (
+        ('target_entity:' target_entity=[EntityDefinition])
+        ('command:' command=STRING)
+        ('parameters:' '-' action_parameters*=ActionParameter['-'])?
+        ('confirmation_required:' confirmation_required=BOOL)?
+        ('timeout:' timeout=FLOAT)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('message:' message=STRING)
+        ('notification_type:' notification_type=NotificationType)
+        ('recipients:' '[' recipients*=STRING[','] ']')
+        ('priority:' priority=NotificationPriority)?
+        ('template:' template=STRING)?
+    )#
+    'end'
+;
+
+DataAction:
+    'Action<Data>' name=ID
+    (
+        ('operation:' operation=DataOperation)
+        ('target_entity:' target_entity=[EntityDefinition])?
+        ('data_source:' data_source=STRING)?
+        ('query:' query=STRING)?
+        ('storage_location:' storage_location=STRING)?
+    )#
+    'end'
+;
+
+SystemAction:
+    'Action<System>' name=ID
+    (
+        ('operation:' operation=SystemOperation)
+        ('target_system:' target_system=STRING)?
+        ('script_path:' script_path=STRING)?
+        ('environment_vars:' '-' env_vars*=EnvironmentVariable['-'])?
+    )#
+    'end'
+;
+
+ActionDefinition:
+    DeviceAction | NotificationAction | DataAction | SystemAction
+;
+
+AutomationDefinition:
+    'Automation' name=ID
+    (
+        ('description:' description=STRING)?
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' '-' automation_conditions*=[ConditionDefinition]['-'])
+        ('actions:' '-' automation_actions*=[ActionDefinition]['-'])
+        ('execution_mode:' execution_mode=ExecutionMode)?
+        ('delay:' delay=FLOAT)?
+        ('max_executions:' max_executions=INT)?
+    )#
+    'end'
+;

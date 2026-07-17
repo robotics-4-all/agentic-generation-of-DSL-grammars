@@ -1,0 +1,155 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        broker=BrokerConfig?
+        auth=AuthConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    'Broker'
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('protocol:' protocol=BrokerProtocol)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+BrokerProtocol:
+    'MQTT' | 'HTTP' | 'CoAP'
+;
+
+AuthConfig:
+    'Authentication'
+    (
+        ('type:' auth_type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('cert_path:' cert_path=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate' | 'none'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'float' | 'int' | 'string' | 'bool' | 'timestamp'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+Trigger:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityTrigger:
+    'on' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'at' time=TimeSpec
+;
+
+EventTrigger:
+    'event' event_name=STRING
+;
+
+TimeSpec:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' recipient=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours'
+;

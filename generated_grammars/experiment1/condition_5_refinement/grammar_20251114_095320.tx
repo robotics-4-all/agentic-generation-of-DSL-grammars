@@ -1,0 +1,236 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+        actions*=ActionDef
+        execution_controls*=ExecutionControl
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    UsernamePasswordAuth | TokenAuth | CertificateAuth
+;
+
+UsernamePasswordAuth:
+    'Auth<UserPass>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('database:' database=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+Value:
+    STRING | FLOAT | INT | BOOL
+;
+
+BehaviorType:
+    'read' | 'write' | 'notify' | 'command' | 'event'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=Value)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=STRING)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+EntityProperty:
+    entity=[EntityDef] '.' property=ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ConditionValue:
+    STRING | FLOAT | INT | BOOL | EntityProperty
+;
+
+ComparisonExpr:
+    left=EntityProperty operator=ComparisonOperator right=ConditionValue
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpr ')' | comparison=ComparisonExpr
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionSpec:
+    condition_expr=ConditionExpr
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ActionParam:
+    name=ID ':' value=Value
+;
+
+ActionParameters:
+    '{' params*=ActionParam[','] '}'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('target:' target=[EntityDef])
+        ('operation:' operation=STRING)
+        ('parameters:' parameters=ActionParameters)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)?
+        ('recipients:' recipients=STRING)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=ConditionSpec)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

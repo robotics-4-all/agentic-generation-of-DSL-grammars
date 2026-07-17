@@ -1,0 +1,220 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth=AuthenticationConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+AuthType:
+    'basic' | 'token' | 'oauth' | 'certificate'
+;
+
+BasicAuth:
+    'username:' username=STRING 'password:' password=STRING
+;
+
+TokenAuth:
+    'token:' token=STRING
+;
+
+CertAuth:
+    'cert:' cert=STRING 'key:' key=STRING
+;
+
+Credentials:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+AuthenticationConfig:
+    'Authentication'
+    (
+        ('type:' authType=AuthType)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'other'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'list' | 'dict'
+;
+
+DictItem:
+    key=STRING ':' value=PropertyValue
+;
+
+PropertyDict:
+    '{' items*=DictItem[','] '}'
+;
+
+PropertyList:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | PropertyList | PropertyDict
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response'
+;
+
+Behavior:
+    'behavior' name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties*=Property)*
+        ('behaviors:' behaviors*=Behavior)*
+        ('location:' location=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+CronExpression:
+    'cron' ':' expression=STRING
+;
+
+TimeInterval:
+    'interval' ':' seconds=INT
+;
+
+TimeSchedule:
+    CronExpression | TimeInterval
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'event' '(' entity=[Entity] ',' eventType=STRING ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[Entity] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionExpression:
+    SimpleCondition | '(' condition=Condition ')'
+;
+
+Condition:
+    left=ConditionExpression (operator=LogicalOperator right=ConditionExpression)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' target=STRING)? ')'
+;
+
+DelayAction:
+    'delay' '(' seconds=INT ')'
+;
+
+ScriptAction:
+    'script' '(' code=STRING ')'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions*=Condition)*
+        ('actions:' actions*=Action)*
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

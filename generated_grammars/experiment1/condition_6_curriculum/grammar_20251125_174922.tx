@@ -1,0 +1,239 @@
+SmartHomeModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportStm:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('exchange:' exchange=STRING)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)?
+        ('auth_token:' auth_token=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+CapabilityDef:
+    name=ID ':' action_type=ActionType
+;
+
+ActionType:
+    'read' | 'write' | 'execute' | 'notify'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('description:' description=STRING)?
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' condition=ConditionExpr)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'parallel' | 'sequential'
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOp right=ConditionTerm)*
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpr ')' | condition=PrimitiveCondition
+;
+
+PrimitiveCondition:
+    TimeCondition | EntityCondition | ValueCondition | EventCondition
+;
+
+TimeCondition:
+    'time' operator=ComparisonOp value=TimeValue
+;
+
+EntityCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+ValueCondition:
+    left=ValueExpr operator=ComparisonOp right=ValueExpr
+;
+
+EventCondition:
+    'event' '(' event_type=STRING ',' source=STRING? ')'
+;
+
+ValueExpr:
+    EntityRef | PropertyValue | MathExpr
+;
+
+EntityRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+MathExpr:
+    left=MathTerm (operator=ArithmeticOp right=MathTerm)*
+;
+
+MathTerm:
+    '(' expr=MathExpr ')' | operand=MathOperand
+;
+
+MathOperand:
+    EntityRef | NUMBER | FunctionCall
+;
+
+FunctionCall:
+    function_name=ID '(' args*=ValueExpr[','] ')'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+LogicalOp:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ArithmeticOp:
+    '+' | '-' | '*' | '/' | '%'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+EntityAction:
+    'set' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING ',' channel=STRING? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+ScriptAction:
+    'script' '(' script_path=STRING ',' params*=PropertyValue[','] ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

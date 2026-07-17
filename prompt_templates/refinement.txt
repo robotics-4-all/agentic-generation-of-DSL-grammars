@@ -1,0 +1,401 @@
+------------------1-------------------
+TEXTX LR PARSER ORDERING CONSTRAINT:
+-   When using choice operators ('|') with overlapping token patterns, 
+    order alternatives from LEAST SPECIFIC to MOST SPECIFIC to avoid parser conflicts.
+
+-   For numeric types: Always place 'FloatRules' BEFORE 'IntRules' because 
+    FloatRules accept a broader range of inputs (both integers and floats), while IntRules only accept integers.
+
+- General rule: Order choices as: Broader patterns → Narrower patterns, Less restrictive → More restrictive.
+
+- Example: 
+   Rule:
+      'FloatAction | IntAction | StringAction' (!!!!!CORRECT!!!!!) 
+      vs
+   Rule:
+      'IntAction | FloatAction | StringAction' (!!!!!WRONG!!!!!).
+
+
+------------------2-------------------
+TEXTX PARENTHESES GROUPING AND MODIFIER PLACEMENT:
+- Parentheses define the scope of modifiers (#, *, +, ?) in textX grammar rules.
+- INCORRECT: Placing opening parenthesis before literals that should be outside the modified group.
+- CORRECT: Group only the elements that should be affected by the modifier.
+- Common mistake: Including start/end literals within parentheses when they should be separate.
+- Example:
+   Rule:
+      'start' (field1=ID field2=STRING)* 'end'  (!!!!!CORRECT!!!!)
+      vs
+   Rule:
+      ('start' field1=ID field2=STRING 'end')*  (!!!!!WRONG!!!!)
+-   The wrong version makes the entire sequence (including literals) repeatable,
+    while the correct version only repeats the field group between fixed start/end markers.
+
+-   General rule: Literals that mark boundaries should typically be OUTSIDE parentheses, 
+    while variable content should be INSIDE parentheses before applying modifiers.
+
+
+------------------3-------------------
+TEXTX ROOT RULE REQUIREMENT:
+-   Every textX grammar MUST have a clearly defined root rule that specifies the complete model structure.
+
+-   Without a root rule, the parser may terminate prematurely after parsing the first major section,
+    causing "Expected EOF" errors when more content follows.
+
+-   INCORRECT: Having only individual component rules without a top-level model structure.
+
+-   CORRECT: Define a root rule that encompasses all major sections of your DSL in the expected sequence.
+
+-   The root rule should use appropriate modifiers:
+    - Use ? for optional sections (metadata?, config?)
+    - Use * for zero-or-more collections (entities*, rules*)
+    - Use + for one-or-more required collections (entities+, rules+)
+
+- Example:
+   MyDSLModel:
+      imports*=Import
+      (metadata=Metadata)?
+      (config=Configuration)?
+      entities*=Entity
+      rules*=Rule
+   ;  (!!!!!CORRECT!!!!)
+   vs
+   [No root rule defined, only individual component rules]  (!!!!!WRONG!!!!)
+
+-   General rule: Always define a root rule that describes the complete,
+    valid structure of your domain-specific language models.
+
+
+------------------4-------------------
+TEXTX RULE DECLARATION ORDER:
+- In textX grammars, rules must be declared BEFORE they are referenced by other rules.
+- INCORRECT: Defining the root rule first when it references rules that are declared later in the file.
+- CORRECT: Declare component rules first, then define the root rule that references them at the end.
+- Forward references to undeclared rules will cause parsing failures or unexpected behavior.
+- Rule declaration order should follow dependency hierarchy:
+  1. Basic/primitive rules (terminals, simple types)
+  2. Component rules (entities, metadata, configurations) 
+  3. Complex composite rules that reference components
+  4. Root rule that references all major components (should be last or near the end)
+- Example:
+   // Component rules first
+   MetadataDecl: 'Metadata' ... ;
+   ImportStmt: 'import' ... ;
+   Entity: 'Entity' ... ;
+   
+   // Root rule last
+   MyDSLModel: 
+       imports*=ImportStmt
+       (metadata=MetadataDecl)?
+       entities*=Entity
+   ;  (!!!!!CORRECT!!!!)
+   
+   vs
+   
+   // Root rule first (references undeclared rules)
+   MyDSLModel: imports*=ImportStmt ... ;
+   ImportStmt: 'import' ... ;  (!!!!!WRONG!!!!)
+-   General rule: Organize grammar rules in dependency order - referenced rules must be declared before 
+    the rules that reference them.
+
+
+------------------5-------------------
+TEXTX STANDARD PROGRAMMING TERMINOLOGY:
+- When defining data types, operators, or language constructs in textX grammars, 
+  prefer standard programming terminology over verbose alternatives.
+
+- Using familiar programming conventions improves readability and reduces confusion 
+  for developers who will write models using your DSL.
+
+- INCORRECT: Using non-standard or overly verbose type names that differ from 
+  common programming conventions.
+
+- CORRECT: Use standard programming language terminology that developers already know.
+
+- Common examples:
+  Data types: Use 'int' instead of 'integer', 'bool' instead of 'boolean', 
+  'str' instead of 'string' (when appropriate for your language style)
+  
+  Operators: Use standard symbols (==, !=, &&, ||) instead of verbose words 
+  (equals, notEquals, and, or) when not designing a natural language DSL
+
+- Example:
+   DataType:
+      'int' | 'float' | 'bool' | 'string'  (!!!!!CORRECT!!!!)
+      vs
+   DataType:
+      'integer' | 'float' | 'boolean' | 'string'  (!!!!!WRONG for programming-style DSLs!!!!)
+
+- Exception: If your DSL is intentionally designed for non-programmers or uses 
+  natural language syntax, verbose terms may be more appropriate.
+
+- General rule: Match the terminology conventions of the target audience - use 
+  standard programming terms (int, bool, etc.) for developer-facing DSLs, and 
+  verbose terms (integer, boolean, etc.) for non-technical user-facing DSLs.
+
+
+  ------------------6-------------------
+TEXTX UNORDERED GROUP OPERATOR FOR FLEXIBLE ELEMENT ORDERING:
+
+- By default, textX grammar rules require elements to appear in a strict sequence.
+  Without explicit ordering control, the parser expects elements in the exact order defined.
+
+- To allow elements to appear in ANY order within a section, use the unordered group operator '#' 
+  after the closing parenthesis of the group.
+
+- INCORRECT: Omitting '#' when you want flexible ordering, forcing users to follow a rigid sequence.
+
+- CORRECT: Wrap related elements in parentheses and add '#' to allow any ordering.
+
+- The '#' operator is particularly important for root rules and configuration sections where 
+  users should have freedom to organize content logically.
+
+- Example:
+   SmartEnvironmentModel:
+      (
+          metadata=Metadata?
+          brokers*=BrokerConfig
+          auth_mechanisms*=AuthMechanism
+          entities*=Entity
+          actions*=Action
+      )#
+   ;  (!!!!!CORRECT!!!!)
+   
+   vs
+   
+   SmartEnvironmentModel:
+      (metadata=Metadata)?
+      (brokers*=BrokerConfig)?
+      (auth_mechanisms*=AuthMechanism)?
+      (entities*=Entity)?
+      (actions*=Action)?
+   ;  (!!!!!WRONG - forces strict order: metadata, then brokers, then auth, etc.!!!!)
+
+- Without '#', a model with Auth before Broker will fail, even though logically both orderings 
+  should be valid.
+
+- Common use cases for '#':
+  * Root model rules where section order shouldn't matter
+  * Configuration blocks where property order is arbitrary
+  * Metadata sections where field order is flexible
+
+- General rule: Use the unordered group operator '#' whenever element ordering should not be 
+  enforced, allowing users to organize their models in the most logical and readable way for 
+  their specific use case.
+
+
+  ------------------7-------------------
+TEXTX EXPLICIT CLOSURE WITH 'END' KEYWORD:
+
+- When defining block-level structures in textX grammars, decide whether they need explicit 
+  closing keywords ('end') or implicit closure through property groups.
+
+- INCORRECT: Inconsistently applying 'end' keywords - some blocks have them, others don't, 
+  causing confusion about when to close blocks in models.
+
+- CORRECT: Follow a clear pattern: top-level named declarations use 'end', while embedded 
+  property configurations use unordered groups (#) without 'end'.
+
+- Top-level blocks that should have 'end':
+  * Named entities (Entity, Broker, Authentication, Action, Automation, etc.)
+  * Metadata declarations
+  * Any block that can be independently defined and referenced
+
+- Embedded structures that should NOT have 'end':
+  * Triggers embedded in Automation (StateTrigger, TimeTrigger, EventTrigger)
+  * Conditions embedded in other structures (ComparisonCondition, LogicalCondition)
+  * Property groups within other blocks
+  * Inline configurations that are part of a parent structure
+
+- Example:
+   Entity:
+       'Entity' name=ID
+       (
+           ('type:' entityType=EntityType)
+           ('broker:' broker=[Broker])
+       )#
+       'end'  (!!!!!CORRECT - top-level block needs 'end'!!!!)
+   ;
+   
+   StateTrigger:
+       'StateTrigger'
+       (
+           ('entity:' entity=[Entity])
+           ('condition:' condition=ComparisonCondition)
+       )#
+       // NO 'end' keyword here (!!!!!CORRECT - embedded structure!!!!)
+   ;
+   
+   vs
+   
+   StateTrigger:
+       'StateTrigger'
+       (
+           ('entity:' entity=[Entity])
+           ('condition:' condition=ComparisonCondition)
+       )#
+       'end'  (!!!!!WRONG - embedded structures don't need 'end'!!!!)
+   ;
+
+- Rule of thumb for determining if 'end' is needed:
+  1. If the structure has a name=ID and can be referenced elsewhere → needs 'end'
+  2. If it's embedded as a property value within another structure → no 'end'
+  3. If it appears at the top level of the model → needs 'end'
+  4. If it's part of a composition/aggregation relationship → no 'end'
+
+- General rule: Use 'end' keywords for independently-defined, referenceable blocks at the 
+  top level of your DSL. Do not use 'end' for embedded property groups or inline 
+  configurations that exist only within their parent structure. Consistency in this pattern 
+  makes the grammar more predictable and models easier to write.
+
+  ------------------8-------------------
+TEXTX PROPERTY ACCESS IDENTIFIER TYPES:
+
+- When defining grammar rules for property access patterns (e.g., `entity.property`), 
+  use ID for property names, not STRING.
+
+- Property access in conditions, expressions, and references should use unquoted identifiers
+  to match standard programming language conventions.
+
+- INCORRECT: Using STRING for property names in access patterns forces users to write quoted
+  identifiers, creating unnatural syntax like `sensor."temperature"` instead of `sensor.temperature`.
+
+- CORRECT: Use ID for property identifiers in dot-notation access patterns to enable natural,
+  unquoted syntax that matches how properties are defined.
+
+- Consistency principle: If properties are defined with `name=ID` in property definitions,
+  then property access should also use `property=ID` to maintain consistency throughout the grammar.
+
+- Example:
+   PropertyCondition:
+       entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+   ;  (!!!!!CORRECT!!!!)
+   
+   vs
+   
+   PropertyCondition:
+       entity=[EntityDefinition] '.' property=STRING operator=ComparisonOperator value=PropertyValue
+   ;  (!!!!!WRONG - requires quoted property names like "temperature"!!!!)
+
+- This enables natural expressions like:
+  * `tempSensor.temperature > 25.0` ✓
+  * `lightActuator.brightness == 100` ✓
+  
+  Instead of forcing:
+  * `tempSensor."temperature" > 25.0` ✗
+  * `lightActuator."brightness" == 100` ✗
+
+- Apply this rule to all property access contexts:
+  * PropertyCondition in condition expressions
+  * StateCondition for entity state checks
+  * ActionParameter references to entity properties
+  * Any dot-notation property access pattern
+
+- General rule: Use ID for property identifiers in all access patterns (object.property)
+  to provide intuitive, programming-style syntax that matches how properties are originally
+  defined in your DSL.
+
+  ------------------9-------------------
+TEXTX STRUCTURAL CONSISTENCY IN EXPRESSION PATTERNS:
+
+- When defining comparison or expression patterns that appear in multiple contexts (triggers, 
+  conditions, filters, etc.), ensure they use consistent structural patterns throughout the grammar.
+
+- INCORRECT: Using different syntactic structures for semantically equivalent comparisons in 
+  different parts of the grammar (e.g., entity.property > value in conditions but just 
+  entity > value in triggers).
+
+- CORRECT: Use the same expression pattern structure across all contexts where similar 
+  comparisons occur.
+
+- Common inconsistency: Defining detailed expression rules (EntityValueRef with entity.property) 
+  for condition expressions, but simplified patterns (just entity reference) for triggers or 
+  other comparison contexts.
+
+- This causes confusion because users expect to write the same type of comparison the same way 
+  regardless of where it appears in the model.
+
+- Example:
+   // Condition expression (detailed)
+   EntityValueRef:
+       entity=[EntityDefinition] '.' property=ID
+   ;
+   
+   ComparisonExpression:
+       left=ValueExpression operator=ComparisonOperator right=ValueExpression
+   ;
+   
+   // Trigger should use the SAME pattern
+   StateTrigger:
+       'state' ':' entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+   ;  (!!!!!CORRECT!!!!)
+   
+   vs
+   
+   StateTrigger:
+       'state' ':' entity=[EntityDefinition] operator=ComparisonOperator value=PropertyValue
+   ;  (!!!!!WRONG - missing property access pattern!!!!)
+
+- If conditions allow `tempSensor.temperature > 25.0`, then triggers should allow the same syntax.
+- If triggers allow `entity > value`, then conditions should also support entity-level comparisons.
+
+- Best practice: Define a shared expression rule that both contexts can reuse:
+   PropertyComparison:
+       entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+   ;
+   
+   Then use it consistently:
+   StateTrigger: 'state' ':' comparison=PropertyComparison ;
+   ComparisonExpression: comparison=PropertyComparison | '(' expression=LogicalExpression ')' ;
+
+- General rule: Identify all locations in your grammar where comparisons, expressions, or 
+  similar patterns appear, and ensure they use structurally consistent syntax. Users should 
+  be able to write `entity.property > value` the same way everywhere, not learn different 
+  syntax for triggers vs conditions vs filters.
+
+  ------------------10-------------------
+TEXTX LEFT RECURSION PREVENTION:
+
+- TextX parsers cannot handle left recursion - rules where a non-terminal can directly or 
+  indirectly reference itself as the leftmost element in its definition.
+
+- Left recursion causes "maximum recursion depth exceeded" errors during parsing because the 
+  parser enters an infinite loop trying to resolve the recursive reference.
+
+- INCORRECT: Defining a rule that references itself (directly or indirectly) as the first 
+  element on the right-hand side.
+
+- CORRECT: Restructure recursive patterns using repetition operators (*, +) or by introducing 
+  intermediate non-recursive rules.
+
+- Common left recursion pattern:
+   Condition: LogicalCondition | SimpleCondition ;
+   LogicalCondition: left=Condition operator=LogicalOp right=Condition ;
+   (!!!!!WRONG - Condition → LogicalCondition → left=Condition → infinite loop!!!!)
+
+- Correct restructuring using repetition:
+   PrimitiveCondition: ComparisonCondition | TimeCondition | StateCondition ;
+   Condition: left=PrimitiveCondition (operator=LogicalOp right=PrimitiveCondition)* ;
+   (!!!!!CORRECT - starts with non-recursive base, then repeats!!!!)
+
+- Key principle: Break the recursion chain by:
+  1. Identifying the base (non-recursive) cases
+  2. Creating a separate rule for base cases (e.g., PrimitiveCondition, SimpleTerm)
+  3. Using the base rule with repetition operators instead of direct recursion
+  4. The main rule starts with the base case, then optionally continues with operators
+
+- Another common pattern - arithmetic expressions:
+   WRONG:
+   Expression: Expression '+' Term | Term ;
+   
+   CORRECT:
+   Expression: left=Term (operator=('+' | '-') right=Term)* ;
+
+- Detection: If you see "maximum recursion depth exceeded" errors, check for:
+  * A rule that references itself as its first alternative
+  * A chain of rules where rule A references rule B, which references rule A as first element
+  * Any rule where the parser would need to resolve the same rule infinitely to proceed
+
+- General rule: Never allow a grammar rule to reference itself (directly or through other rules) 
+  as the leftmost symbol. Always restructure using base cases with repetition operators to 
+  express recursive patterns without left recursion.

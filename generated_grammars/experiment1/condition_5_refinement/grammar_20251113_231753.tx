@@ -1,0 +1,258 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=MessageBroker
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+PropertyDataType:
+    'str' | 'float' | 'int' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+BehaviorTrigger:
+    'onChange' | 'onMessage' | 'onSchedule' | 'onCondition'
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'execute' | 'notify'
+;
+
+SystemMetadata:
+    'SystemMetadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+PlainAuth:
+    'PlainAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+    )#
+;
+
+CertificateAuth:
+    'CertificateAuth'
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+    )#
+;
+
+AuthenticationConfig:
+    PlainAuth | TokenAuth | CertificateAuth
+;
+
+MQTTBroker:
+    'MQTTBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationConfig)?
+        ('baseTopic:' baseTopic=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'AMQPBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationConfig)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'RedisBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationConfig)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityProperty:
+    'properties:' name=ID ':' dataType=PropertyDataType ('=' defaultValue=PropertyValue)?
+;
+
+EntityBehavior:
+    'behaviors:' 'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('actions:' actions*=BehaviorAction)
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        properties*=EntityProperty
+        behaviors*=EntityBehavior
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=STRING)
+        ('repeat:' repeat=BOOL)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('event:' event=STRING)
+    )#
+    'end'
+;
+
+EntityReference:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ConditionOperand:
+    EntityReference | LiteralValue
+;
+
+SimpleCondition:
+    left=ConditionOperand operator=ComparisonOperator right=ConditionOperand
+;
+
+Condition:
+    left=SimpleCondition (logicalOp=LogicalOperator right=SimpleCondition)*
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('condition:' condition=Condition)
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+PublishAction:
+    'PublishAction'
+    (
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('message:' message=STRING)
+        ('retain:' retain=BOOL)?
+    )#
+    'end'
+;
+
+ControlAction:
+    'ControlAction'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+    )#
+    'end'
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)?
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+ActionParameter:
+    'parameters:' name=ID ':' value=PropertyValue
+;
+
+ServiceAction:
+    'ServiceAction'
+    (
+        ('service:' service=STRING)
+        ('method:' method=STRING)
+        parameters*=ActionParameter
+    )#
+    'end'
+;
+
+Action:
+    PublishAction | ControlAction | NotificationAction | ServiceAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' conditions*=Condition)
+        ('actions:' actions*=Action)
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

@@ -1,0 +1,235 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDef
+        auth*=AuthDef
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+PropertyDef:
+    name=ID ':' dtype=DataType ('=' default=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' action=STRING
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDef] ',' event=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+TriggerDef:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EntityCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=STRING
+;
+
+ValueCondition:
+    left=PropertyValue operator=ComparisonOperator right=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+Condition:
+    '(' condition=ConditionGroup ')' | SimpleCondition
+;
+
+ConditionGroup:
+    left=Condition (operator=LogicalOperator right=Condition)*
+;
+
+EntityAction:
+    'SetEntity' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+NotificationAction:
+    'Notify' '(' message=STRING (',' channel=STRING)? ')'
+;
+
+DelayAction:
+    'Delay' '(' duration=INT ')'
+;
+
+ScriptAction:
+    'Script' '(' script=STRING ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+KeyAuth:
+    'Auth<Key>' name=ID
+    (
+        ('key:' key=STRING)
+        ('secret:' secret=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+    )#
+    'end'
+;
+
+AuthDef:
+    BasicAuth | TokenAuth | KeyAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthDef])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthDef])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthDef])?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerDef])?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

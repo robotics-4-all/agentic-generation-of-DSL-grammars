@@ -1,0 +1,260 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=Broker)
+        (entities*=Entity)
+        (automations*=Automation)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+SystemInfo:
+    '{'
+    (
+        ('platform:' platform=STRING)?
+        ('environment:' environment=STRING)?
+        ('deployment:' deployment=STRING)?
+    )#
+    '}'
+;
+
+HeaderList:
+    '[' headers*=Header[','] ']'
+;
+
+Header:
+    key=STRING ':' value=STRING
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ApiKeyLocation:
+    'header' | 'query' | 'cookie'
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+ApiKeyAuth:
+    'ApiKeyAuth'
+    (
+        ('key:' key=STRING)
+        ('location:' location=ApiKeyLocation)?
+    )#
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+;
+
+Authentication:
+    BasicAuth | ApiKeyAuth | TokenAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=HeaderList)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+Broker:
+    HTTPBroker | AMQPBroker | MQTTBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'virtual'
+;
+
+DataType:
+    'string' | 'int' | 'bool' | 'object' | 'array'
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}' 
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    STRING | FLOAT | BOOL | ObjectValue | ArrayValue
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+Behavior:
+    'behavior' name=ID ':' implementation=STRING
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TriggerOperator:
+    'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'contains' | 'changes'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+CronExpression:
+    'cron' expression=STRING
+;
+
+IntervalExpression:
+    'every' interval=FLOAT unit=TimeUnit
+;
+
+ScheduleExpression:
+    'at' time=STRING ('on' days*=DayOfWeek[','])?
+;
+
+TimeExpression:
+    CronExpression | IntervalExpression | ScheduleExpression
+;
+
+EntityTrigger:
+    'on_entity' entity=[Entity] ('.' property=ID)? operator=TriggerOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'on_time' time_expression=TimeExpression
+;
+
+EventTrigger:
+    'on_event' event_name=STRING
+;
+
+Trigger:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+SimpleCondition:
+    entity=[Entity] ('.' property=ID)? comparison_operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionTerm:
+    SimpleCondition | '(' condition=ConditionExpression ')'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+EntityAction:
+    'set' entity=[Entity] ('.' property=ID)? 'to' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('via' channel=STRING)?
+;
+
+ServiceAction:
+    'call_service' service_name=STRING ('with' parameters=ObjectValue)?
+;
+
+DelayAction:
+    'delay' duration=FLOAT unit=TimeUnit
+;
+
+Action:
+    EntityAction | NotificationAction | ServiceAction | DelayAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionExpression)?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system_info:' system_info=SystemInfo)?
+    )#
+    'end'
+;

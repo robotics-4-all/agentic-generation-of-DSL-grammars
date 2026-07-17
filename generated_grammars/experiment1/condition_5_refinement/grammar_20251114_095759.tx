@@ -1,0 +1,340 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        brokers*=MessageBroker
+        authentications*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Import:
+    'import' importURI=FQN ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=ID)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    HTTPBroker | AMQPBroker | MQTTBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('basePath:' basePath=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    CertificateAuth | TokenAuth | BasicAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('tokenType:' tokenType=TokenType)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caCertPath:' caCertPath=STRING)?
+    )#
+    'end'
+;
+
+TokenType:
+    'Bearer' | 'Basic' | 'ApiKey'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('dataType:' dataType=DataType)
+        ('unit:' unit=STRING)?
+        ('minValue:' minValue=NUMBER)?
+        ('maxValue:' maxValue=NUMBER)?
+        ('defaultValue:' defaultValue=PropertyValue)?
+        ('readonly:' readonly=BOOL)?
+    )#
+    'end'
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('action:' action=[Action])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+BehaviorTrigger:
+    'onChange' | 'onValue' | 'onTime' | 'onEvent'
+;
+
+DataType:
+    'int' | 'float' | 'str' | 'bool' | 'datetime' | 'json'
+;
+
+PropertyValue:
+    NUMBER | STRING | BOOL
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=STRING)
+        ('timezone:' timezone=STRING)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)?
+        ('eventType:' eventType=EventType)
+    )#
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('condition:' condition=[Condition])
+    )#
+;
+
+EventType:
+    'valueChanged' | 'stateChanged' | 'online' | 'offline' | 'error'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionExpression:
+    EntityCondition | left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    ComparisonExpression | EntityCondition
+;
+
+ComparisonExpression:
+    leftOperand=ConditionOperand operator=ComparisonOperator rightOperand=ConditionOperand
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionOperand:
+    value=PropertyValue | entityRef=EntityReference
+;
+
+EntityReference:
+    entity=[Entity] '.' property=ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+Action:
+    ScriptAction | NotificationAction | DelayAction | EntityAction
+;
+
+EntityAction:
+    'Action<Entity>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+        ('method:' method=ActionMethod)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('recipient:' recipient=STRING)
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+ScriptAction:
+    'Action<Script>' name=ID
+    (
+        ('scriptPath:' scriptPath=STRING)
+        ('parameters:' '-' parameters*=ScriptParameter['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'Action<Delay>' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+ScriptParameter:
+    'Parameter' name=ID
+    (
+        ('value:' value=PropertyValue)
+        ('type:' type=DataType)
+    )#
+    'end'
+;
+
+ActionMethod:
+    'set' | 'toggle' | 'increment' | 'decrement'
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook'
+;
+
+NotificationPriority:
+    'low' | 'medium' | 'high' | 'critical'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+FQN:
+    ID ('.' ID)*
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

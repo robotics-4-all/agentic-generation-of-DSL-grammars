@@ -1,0 +1,310 @@
+SmartEnvironmentModel:
+    (
+        imports*=Import
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=AuthenticationDef
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepAlive:' keepAlive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)
+        ('routingKey:' routingKey=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('port:' port=INT)?
+        ('path:' path=STRING)?
+        ('headers:' headers=HTTPHeaders)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+HTTPHeaders:
+    '{' headers*=HTTPHeader[','] '}'
+;
+
+HTTPHeader:
+    key=STRING ':' value=STRING
+;
+
+AuthenticationDef:
+    'Authentication' name=ID
+    (
+        ('type:' type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('apiKey:' apiKey=STRING)?
+        ('certificate:' certificate=STRING)?
+        ('keyFile:' keyFile=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'bearer' | 'apikey' | 'oauth2' | 'certificate'
+;
+
+Entity:
+    Device | Sensor | Actuator | Service
+;
+
+Device:
+    'Device' name=ID
+    (
+        ('type:' deviceType=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])
+        ('properties:' properties=PropertyList)?
+        ('capabilities:' capabilities*=Capability[','])?
+        ('status:' status=DeviceStatus)?
+    )#
+    'end'
+;
+
+Sensor:
+    'Sensor' name=ID
+    (
+        ('type:' sensorType=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])
+        ('dataType:' dataType=DataType)
+        ('unit:' unit=STRING)?
+        ('range:' range=Range)?
+        ('frequency:' frequency=INT)?
+        ('properties:' properties=PropertyList)?
+    )#
+    'end'
+;
+
+Actuator:
+    'Actuator' name=ID
+    (
+        ('type:' actuatorType=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])
+        ('commands:' commands*=Command[','])?
+        ('states:' states=PropertyList)?
+        ('properties:' properties=PropertyList)?
+    )#
+    'end'
+;
+
+Service:
+    'Service' name=ID
+    (
+        ('type:' serviceType=STRING)
+        ('endpoint:' endpoint=STRING)
+        ('broker:' broker=[MessageBroker])?
+        ('operations:' operations*=Operation[','])?
+        ('properties:' properties=PropertyList)?
+    )#
+    'end'
+;
+
+PropertyList:
+    properties*=Property[',']
+;
+
+Property:
+    name=ID ':' value=PropertyValue
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Capability:
+    name=ID ('(' parameters*=Parameter[','] ')')?
+;
+
+Parameter:
+    name=ID ':' type=DataType ('=' default=PropertyValue)?
+;
+
+DeviceStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+Range:
+    'Range' '(' min=FLOAT ',' max=FLOAT ')'
+;
+
+Command:
+    name=ID ('(' parameters*=Parameter[','] ')')? ('->' response=DataType)?
+;
+
+STATE:
+    name=ID ':' value=PropertyValue
+;
+
+Operation:
+    name=ID ('(' parameters*=Parameter[','] ')')? ('->' response=DataType)?
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ComplexCondition)?
+        ('actions:' actions*=Action[','])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] ',' event=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' value=INT ',' unit=TimeUnit ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ComplexCondition:
+    OrCondition
+;
+
+OrCondition:
+    left=AndCondition ('or' right=AndCondition)*
+;
+
+AndCondition:
+    left=PrimaryCondition ('and' right=PrimaryCondition)*
+;
+
+PrimaryCondition:
+    SimpleCondition | '(' condition=ComplexCondition ')'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+StateCondition:
+    property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+PrimitiveCondition:
+    SimpleCondition | '(' condition=Condition ')'
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    CommandAction | NotificationAction | StateChangeAction | ServiceCallAction
+;
+
+CommandAction:
+    'Command' '(' entity=[Entity] ',' command=STRING (',' parameters=ParameterList)? ')'
+;
+
+NotificationAction:
+    'Notify' '(' message=STRING (',' recipients*=STRING[','])? ')'
+;
+
+StateChangeAction:
+    'SetState' '(' entity=[Entity] ',' property=ID ',' value=PropertyValue ')'
+;
+
+ServiceCallAction:
+    'CallService' '(' service=[Entity] ',' operation=STRING (',' parameters=ParameterList)? ')'
+;
+
+ParameterList:
+    '{' parameters*=ParameterAssignment[','] '}'
+;
+
+ParameterAssignment:
+    name=ID '=' value=PropertyValue
+;

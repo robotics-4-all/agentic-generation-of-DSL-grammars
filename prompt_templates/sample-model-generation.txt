@@ -1,0 +1,178 @@
+Sample Model Generation for Grammar Beta Testing
+
+Task:
+You are an expert in Domain-Specific Languages (DSLs) and textX grammar. Your task is to generate sample models that demonstrate and validate the capabilities of a given textX grammar.
+
+EXAMPLE: Calculator DSL
+========================
+
+To illustrate what is expected, here's a complete example:
+
+Example Requirements:
+R1 - The grammar should support variable declarations with numeric types.
+R2 - The grammar should support basic arithmetic operations (add, subtract, multiply, divide).
+R3 - The grammar should support function definitions with parameters.
+R4 - The grammar should support conditional expressions (if-then-else).
+R5 - The grammar should support loops with iteration control.
+R6 - The grammar should support comments for documentation.
+
+Example Grammar:
+```
+Program: statements*=Statement;
+
+Statement:
+    VariableDeclaration | Assignment | FunctionDef | IfStatement | Loop | Expression
+;
+
+VariableDeclaration:
+    'var' name=ID ':' type=Type '=' value=Expression
+;
+
+Type: 'int' | 'float';
+
+Assignment:
+    name=ID '=' value=Expression
+;
+
+FunctionDef:
+    'function' name=ID '(' params*=Parameter[','] ')' ':' type=Type
+    'begin'
+        body*=Statement
+    'end'
+;
+
+Parameter: name=ID ':' type=Type;
+
+IfStatement:
+    'if' condition=Expression 'then'
+        then_body*=Statement
+    ('else'
+        else_body*=Statement)?
+    'endif'
+;
+
+Loop:
+    'for' var=ID 'in' start=Expression 'to' end=Expression
+        body*=Statement
+    'endfor'
+;
+
+Expression:
+    Arithmetic | FunctionCall | ID | NUMBER
+;
+
+Arithmetic:
+    left=Operand op=Operator right=Operand
+;
+
+Operand: NUMBER | ID | '(' Expression ')';
+
+Operator: '+' | '-' | '*' | '/';
+
+FunctionCall:
+    name=ID '(' args*=Expression[','] ')'
+;
+
+Comment: /\/\/.*$/;
+```
+
+Example Sample Models (covering requirements):
+
+Model 1 (R1 - Variable declarations):
+```
+var x : int = 10
+var y : float = 3.14
+var z : int = 42
+```
+
+Model 2 (R2 - Arithmetic operations):
+```
+var a : int = 5 + 3
+var b : int = 10 - 2
+var c : int = 4 * 6
+var d : float = 20 / 4
+```
+
+Model 3 (R3 - Function definition):
+```
+function add : int
+begin
+    var result : int = 10 + 5
+end
+
+function multiply : int
+begin
+    var product : int = 3 * 7
+end
+```
+
+Model 4 (R4 - Conditional expression):
+```
+var x : int = 10
+if x then
+    var y : int = 20
+else
+    var y : int = 30
+endif
+```
+
+Model 5 (R5 - Loop):
+```
+for i in 1 to 10
+    var temp : int = i * 2
+endfor
+```
+
+Model 6 (R1 + R2 + R6 - Combined: variables, arithmetic, comments):
+```
+var a : int = 5
+var b : int = 10
+var sum : int = a + b
+var product : int = a * b
+```
+
+========================
+END OF EXAMPLE
+========================
+
+YOUR TASK:
+==========
+
+The grammar you need to generate sample models for was created to satisfy the following requirements:
+{{REQUIREMENTS}}
+
+Here is the generated textX grammar:
+```
+{{GRAMMAR}}
+```
+
+Your goal is to generate approximately {{NUM_MODELS}} sample models that:
+1. Each model should demonstrate at least one requirement (from the requirements above)
+2. Some models should combine 2-3 requirements to show integrated functionality
+3. Models should be syntactically valid according to the textX grammar above
+4. Models should cover diverse use cases and edge cases where applicable
+5. Think of these as "beta test" models that validate the grammar works correctly
+6. Follow the style shown in the Calculator DSL example above
+
+Guidelines:
+- Generate models that are realistic and meaningful
+- Cover both simple cases (single requirement) and complex cases (multiple requirements)
+- Ensure models are syntactically correct according to the grammar
+- Each model should be self-contained and parseable
+- Vary the complexity and structure across models
+- Use the Calculator DSL example as inspiration for structure and variety
+
+CRITICAL: Return models in the following format:
+- Each model separated by a line containing exactly: --- MODEL_SEPARATOR ---
+- NO markdown formatting (no ```, no code blocks)
+- NO explanations between models
+- ONLY the model content that can be directly parsed by textX
+
+Example output format:
+<model content for model 1>
+--- MODEL_SEPARATOR ---
+<model content for model 2>
+--- MODEL_SEPARATOR ---
+<model content for model 3>
+
+Start generating the sample models now:

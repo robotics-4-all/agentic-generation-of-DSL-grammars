@@ -1,0 +1,267 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        auth*=Authentication  
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)
+        ('author:' author=STRING)
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+Headers:
+    items*=HeaderItem[',']
+;
+
+HeaderItem:
+    key=STRING ':' value=STRING
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)
+        ('auth:' auth=[Authentication])
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('auth:' auth=[Authentication])
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=Headers)
+        ('auth:' auth=[Authentication])
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service'
+;
+
+Properties:
+    items*=Property[',']
+;
+
+Property:
+    name=ID ':' type=DataType ('=' default=Value)?
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+Array:
+    '[' items*=Value[','] ']'
+;
+
+ObjectItem:
+    key=STRING ':' value=Value
+;
+
+Object:
+    '{' items*=ObjectItem[','] '}'
+;
+
+Value:
+    STRING | FLOAT | INT | BOOL | Array | Object
+;
+
+Behaviors:
+    items*=Behavior[',']
+;
+
+Parameter:
+    name=ID ':' type=DataType
+;
+
+ActionBlock:
+    actions*=Action[',']
+;
+
+Behavior:
+    name=ID '(' params*=Parameter[','] ')' ':' action=ActionBlock
+;
+
+Location:
+    'room:' room=STRING ('zone:' zone=STRING)?
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[Broker])
+        ('properties:' properties=Properties)
+        ('behaviors:' behaviors=Behaviors)
+        ('location:' location=Location)
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+IntervalSchedule:
+    'interval' duration=INT unit=TimeUnit
+;
+
+OnceSchedule:
+    'once' datetime=STRING
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'event' entity=[Entity] event=STRING
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'starts_with' | 'ends_with'
+;
+
+PropertyComparison:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=Value
+;
+
+StateTrigger:
+    'state' comparison=PropertyComparison
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+SimpleCondition:
+    comparison=PropertyComparison
+;
+
+LogicalOperator:
+    'and' | 'or'
+;
+
+CompoundCondition:
+    '(' left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)* ')'
+;
+
+Condition:
+    CompoundCondition | SimpleCondition
+;
+
+ConditionGroup:
+    conditions*=Condition[',']
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID '=' value=Value
+;
+
+NotificationAction:
+    'notify' message=STRING ('to:' target=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ScriptAction:
+    'script' code=STRING
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+ActionGroup:
+    actions*=Action[',']
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionGroup)
+        ('actions:' actions=ActionGroup)
+        ('enabled:' enabled=BOOL)
+        ('priority:' priority=INT)
+    )#
+    'end'
+;

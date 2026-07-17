@@ -1,0 +1,296 @@
+SmartEnvModel:
+    (
+        metadata=MetadataDecl?
+        brokers*=BrokerDecl
+        authentication*=AuthenticationDecl
+        entities*=EntityDecl
+        automations*=AutomationDecl
+    )#
+;
+
+MetadataDecl:
+    'metadata' name=ID
+    (
+        ('version' ':' version=STRING)
+        ('description' ':' description=STRING)
+        ('author' ':' author=STRING)
+        ('timestamp' ':' timestamp=STRING)
+    )#
+    'end'
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username' ':' username=STRING)
+        ('password' ':' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token' ':' token=STRING)
+        ('type' ':' tokenType=STRING)
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert' ':' cert=STRING)
+        ('key' ':' key=STRING)
+        ('ca' ':' ca=STRING)
+    )#
+    'end'
+;
+
+AuthenticationDecl:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host' ':' host=STRING)
+        ('port' ':' port=INT)
+        ('ssl' ':' ssl=BOOL)
+        ('keepalive' ':' keepalive=INT)
+        ('qos' ':' qos=INT)
+        ('auth' ':' auth=[AuthenticationDecl])
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host' ':' host=STRING)
+        ('port' ':' port=INT)
+        ('vhost' ':' vhost=STRING)
+        ('exchange' ':' exchange=STRING)
+        ('ssl' ':' ssl=BOOL)
+        ('auth' ':' auth=[AuthenticationDecl])
+    )#
+    'end'
+;
+
+RedisBroker:
+    'broker' 'redis' name=ID
+    (
+        ('host' ':' host=STRING)
+        ('port' ':' port=INT)
+        ('db' ':' db=INT)
+        ('ssl' ':' ssl=BOOL)
+        ('auth' ':' auth=[AuthenticationDecl])
+    )#
+    'end'
+;
+
+BrokerDecl:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+PropertyDecl:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+BehaviorDecl:
+    name=ID '(' parameters*=ParameterDecl[','] ')' 
+    ('returns' ':' returnType=DataType)?
+    ('description' ':' description=STRING)?
+;
+
+ParameterDecl:
+    name=ID ':' paramType=DataType
+;
+
+SensorEntity:
+    'entity' 'sensor' name=ID
+    (
+        ('type' ':' entityType=STRING)
+        ('location' ':' location=STRING)
+        ('topic' ':' topic=STRING)
+        ('broker' ':' broker=[BrokerDecl])
+        ('properties' properties*=PropertyDecl)
+        ('behaviors' behaviors*=BehaviorDecl)
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'entity' 'actuator' name=ID
+    (
+        ('type' ':' entityType=STRING)
+        ('location' ':' location=STRING)
+        ('topic' ':' topic=STRING)
+        ('broker' ':' broker=[BrokerDecl])
+        ('properties' properties*=PropertyDecl)
+        ('behaviors' behaviors*=BehaviorDecl)
+    )#
+    'end'
+;
+
+HybridEntity:
+    'entity' 'hybrid' name=ID
+    (
+        ('type' ':' entityType=STRING)
+        ('location' ':' location=STRING)
+        ('topic' ':' topic=STRING)
+        ('broker' ':' broker=[BrokerDecl])
+        ('properties' properties*=PropertyDecl)
+        ('behaviors' behaviors*=BehaviorDecl)
+    )#
+    'end'
+;
+
+EntityDecl:
+    SensorEntity | ActuatorEntity | HybridEntity
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'async'
+;
+
+TimeTrigger:
+    'trigger' 'time' 
+    ('cron' ':' cronExpr=STRING)
+;
+
+EventTrigger:
+    'trigger' 'event'
+    (
+        ('entity' ':' entity=[EntityDecl])
+        ('event' ':' eventName=STRING)
+    )#
+;
+
+StateTrigger:
+    'trigger' 'state'
+    (
+        ('entity' ':' entity=[EntityDecl])
+        ('property' ':' property=ID)
+        ('condition' ':' condition=ConditionExpr)
+    )#
+;
+
+TriggerDecl:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ExistenceCondition:
+    'exists' entity=[EntityDecl] ('.' property=ID)?
+;
+
+EntityPropertyRef:
+    entity=[EntityDecl] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+FunctionCall:
+    name=ID '(' args*=ValueExpr[','] ')'
+;
+
+ValueExpr:
+    EntityPropertyRef | LiteralValue | FunctionCall
+;
+
+ComparisonCondition:
+    left=ValueExpr operator=ComparisonOperator right=ValueExpr
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '<=' | '>' | '>=' | 'contains' | 'matches'
+;
+
+ConditionExpr:
+    left=PrimitiveCondition (operator=LogicalOperator right=ConditionExpr)?
+;
+
+PrimitiveCondition:
+    ComparisonCondition | ExistenceCondition | '(' ConditionExpr ')'
+;
+
+ConditionDecl:
+    ConditionExpr
+;
+
+EntityAction:
+    'action' 'entity'
+    (
+        ('target' ':' target=[EntityDecl])
+        ('method' ':' method=STRING)
+        ('params' params*=ActionParam)
+    )#
+;
+
+NotificationLevel:
+    'info' | 'warning' | 'error' | 'critical'
+;
+
+NotificationAction:
+    'action' 'notify'
+    (
+        ('message' ':' message=STRING)
+        ('level' ':' level=NotificationLevel)
+        ('channels' ':' channels*=STRING[','])
+    )#
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DelayAction:
+    'action' 'delay'
+    (
+        ('duration' ':' duration=INT)
+        ('unit' ':' unit=TimeUnit)
+    )#
+;
+
+ScriptAction:
+    'action' 'script'
+    (
+        ('language' ':' language=STRING)
+        ('code' ':' code=STRING)
+    )#
+;
+
+ActionParam:
+    name=ID ':' value=ValueExpr
+;
+
+ActionDecl:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+AutomationDecl:
+    'automation' name=ID
+    (
+        ('enabled' ':' enabled=BOOL)
+        ('priority' ':' priority=INT)
+        ('mode' ':' mode=ExecutionMode)
+        ('triggers' triggers*=TriggerDecl)
+        ('conditions' conditions*=ConditionDecl)
+        ('actions' actions*=ActionDecl)
+    )#
+    'end'
+;

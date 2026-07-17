@@ -1,0 +1,204 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth=AuthConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'token' | 'cert' | 'none'
+;
+
+AuthConfig:
+    'Authentication'
+    (
+        ('type:' auth_type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('cert_path:' cert_path=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service'
+;
+
+DataType:
+    'float' | 'int' | 'string' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+CapabilityParam:
+    name=ID ':' param_type=DataType
+;
+
+Capability:
+    name=ID '(' params*=CapabilityParam[','] ')'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+    )#
+    'end'
+;
+
+CronSpec:
+    'cron' expression=STRING
+;
+
+IntervalSpec:
+    'every' interval=INT unit=TimeUnit
+;
+
+AtTimeSpec:
+    'at' time=STRING
+;
+
+TimeSpec:
+    CronSpec | IntervalSpec | AtTimeSpec
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+EntityTrigger:
+    'entity' entity=[Entity] 'property' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' time_spec=TimeSpec
+;
+
+EventTrigger:
+    'event' event_name=STRING
+;
+
+TriggerCondition:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' recipients*=STRING[','])?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

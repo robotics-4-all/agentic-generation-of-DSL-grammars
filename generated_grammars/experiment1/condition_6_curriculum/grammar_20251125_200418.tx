@@ -1,0 +1,237 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+PropertyType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+JsonItem:
+    key=STRING ':' value=PropertyValue
+;
+
+JsonValue:
+    '{' items*=JsonItem[','] '}'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | JsonValue
+;
+
+PropertyDef:
+    name=ID ':' ptype=PropertyType ('=' default=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' action=ActionDef
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDef] ',' event=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+EntityCondition:
+    entity=[EntityDef] '.' property=ID comparator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparator=ComparisonOperator value=STRING
+;
+
+ValueCondition:
+    left=PropertyValue comparator=ComparisonOperator right=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+Condition:
+    '(' condition=ConditionGroup ')' | SimpleCondition
+;
+
+ConditionGroup:
+    left=Condition (operator=LogicalOperator right=Condition)*
+;
+
+EntityAction:
+    'set' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' recipient=STRING)? ')'
+;
+
+DelayAction:
+    'delay' '(' seconds=INT ')'
+;
+
+ScriptAction:
+    'script' '(' code=STRING ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('method:' method=HTTPMethod)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;

@@ -1,0 +1,215 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDeclaration
+        auth_mechanisms*=AuthMechanism
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)?
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+HeaderPair:
+    key=STRING ':' value=STRING
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('topics:' topics*=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)?
+        ('headers:' headers*=HeaderPair)?
+    )#
+    'end'
+;
+
+BrokerDeclaration:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+    )#
+    'end'
+;
+
+AuthMechanism:
+    TokenAuth | BasicAuth | CertAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+PropertyType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+PropertyDefinition:
+    name=ID ':' prop_type=PropertyType ('=' default_value=PropertyValue)?
+;
+
+TriggerEvent:
+    'on_change' | 'on_interval' | 'on_threshold' | 'on_command'
+;
+
+ActionDefinition:
+    SetAction | CallAction | NotifyAction
+;
+
+SetAction:
+    'set' target=EntityProperty 'to' value=PropertyValue
+;
+
+CallAction:
+    'call' service=STRING ('with' parameters*=ParameterPair)?
+;
+
+NotifyAction:
+    'notify' message=STRING ('via' channel=STRING)?
+;
+
+ParameterPair:
+    key=STRING ':' value=PropertyValue
+;
+
+BehaviorDefinition:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('action:' action=ActionDefinition)
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerDeclaration])?
+        ('auth:' auth=[AuthMechanism])?
+        ('properties:' properties*=PropertyDefinition)?
+        ('behaviors:' behaviors*=BehaviorDefinition)?
+        ('location:' location=STRING)?
+    )#
+    'end'
+;
+
+EntityProperty:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+OperandValue:
+    EntityProperty | LiteralValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonCondition:
+    left_operand=OperandValue operator=ComparisonOperator right_operand=OperandValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=STRING
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition
+;
+
+ConditionSpec:
+    left=PrimitiveCondition (logical_op=LogicalOperator right=PrimitiveCondition)*
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ScheduleSpec:
+    'every' interval=INT unit=TimeUnit | 'at' time=STRING
+;
+
+AutomationDeclaration:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('conditions:' conditions*=ConditionSpec)
+        ('actions:' actions*=ActionDefinition)
+        ('schedule:' schedule=ScheduleSpec)?
+    )#
+    'end'
+;

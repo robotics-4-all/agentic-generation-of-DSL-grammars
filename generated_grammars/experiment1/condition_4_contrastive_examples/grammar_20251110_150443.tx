@@ -1,0 +1,296 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=BrokerDef
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportStm:
+    'import' importURI=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+        ('updated:' updated=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+;
+
+ApiKeyAuth:
+    'ApiKeyAuth'
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth | ApiKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=AuthConfig)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthConfig)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('port:' port=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=AuthConfig)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+DataTypeDef:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'array' | 'object'
+;
+
+ObjectProperty:
+    key=STRING ':' value=ValueDef
+;
+
+ArrayValue:
+    '[' values*=ValueDef[','] ']'
+;
+
+ObjectValue:
+    '{' properties*=ObjectProperty[','] '}'
+;
+
+ValueDef:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataTypeDef ('=' defaultValue=ValueDef)?
+;
+
+PropertyTrigger:
+    'PropertyChange'
+    (
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=ValueDef)
+    )#
+;
+
+TimeTrigger:
+    'TimeEvent'
+    (
+        ('schedule:' schedule=STRING)
+        ('interval:' interval=INT)?
+        ('once:' once=BOOL)?
+    )#
+;
+
+EventTrigger:
+    'ExternalEvent'
+    (
+        ('event:' eventName=STRING)
+        ('source:' source=STRING)?
+    )#
+;
+
+TriggerDef:
+    PropertyTrigger | TimeTrigger | EventTrigger
+;
+
+PropertyAction:
+    'SetProperty'
+    (
+        ('entity:' entity=[EntityDef])
+        ('property:' property=ID)
+        ('value:' value=ValueDef)
+    )#
+;
+
+NotificationAction:
+    'SendNotification'
+    (
+        ('message:' message=STRING)
+        ('recipient:' recipient=STRING)?
+        ('channel:' channel=STRING)?
+        ('priority:' priority=INT)?
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ServiceAction:
+    'CallService'
+    (
+        ('service:' serviceName=STRING)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('parameters:' parameters=ObjectValue)?
+    )#
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DelayAction:
+    'Delay'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+ActionDef:
+    PropertyAction | NotificationAction | ServiceAction | DelayAction
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'startsWith' | 'endsWith'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=ValueDef
+;
+
+PrimitiveCondition:
+    SimpleCondition | '(' condition=ConditionDef ')'
+;
+
+ConditionDef:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+BehaviorDef:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('actions:' actions*=ActionDef)
+        ('conditions:' conditions*=ConditionDef)?
+    )#
+    'end'
+;
+
+CoordinateDef:
+    'Coordinates' '(' x=FLOAT ',' y=FLOAT (',' z=FLOAT)? ')'
+;
+
+LocationDef:
+    'Location'
+    (
+        ('room:' room=STRING)?
+        ('zone:' zone=STRING)?
+        ('coordinates:' coordinates=CoordinateDef)?
+    )#
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerDef])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('location:' location=LocationDef)?
+        ('status:' status=STRING)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate' | 'delayed'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('priority:' priority=INT)?
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('description:' description=STRING)?
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions*=ConditionDef)
+        ('actions:' actions*=ActionDef)
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

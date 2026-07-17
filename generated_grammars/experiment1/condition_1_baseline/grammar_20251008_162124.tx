@@ -1,0 +1,221 @@
+SmartEnvironmentModel:
+    imports*=ImportStm
+    metadata=Metadata
+    brokers*=BrokerConfig
+    authentication*=AuthConfig
+    entities*=EntityDef
+    automations*=AutomationDef
+;
+
+ImportStm:
+    'import' grammar_to_import=ID
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('virtual_host:' virtual_host=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('auth:' auth=[AuthConfig])?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'integer' | 'float' | 'boolean' | 'timestamp' | 'json'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+BehaviorType:
+    'read' | 'write' | 'notify' | 'execute'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | PropertyTrigger
+;
+
+TimeTrigger:
+    'time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+PropertyTrigger:
+    'property' '(' entity=[EntityDef] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'immediate'
+;
+
+ConditionDef:
+    PropertyCondition | TimeCondition | StateCondition
+;
+
+PropertyCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=STRING
+;
+
+StateCondition:
+    entity=[EntityDef] '.' 'status' operator=ComparisonOperator value=EntityStatus
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ActionDef:
+    PropertyAction | NotificationAction | ServiceAction
+;
+
+PropertyAction:
+    'set' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING ',' channel=STRING? ')'
+;
+
+ServiceAction:
+    'call' service=STRING '(' parameters=ParameterList? ')'
+;
+
+ParameterList:
+    parameters*=Parameter[',']
+;
+
+Parameter:
+    name=ID '=' value=PropertyValue
+;

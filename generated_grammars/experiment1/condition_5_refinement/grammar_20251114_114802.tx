@@ -1,0 +1,290 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication=Authentication?
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+AuthType:
+    'basic' | 'oauth' | 'token' | 'certificate'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+BehaviorTrigger:
+    'periodic' | 'event' | 'threshold' | 'manual'
+;
+
+ExecutionMode:
+    'immediate' | 'scheduled' | 'delayed' | 'conditional'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+ActionType:
+    'command' | 'notification' | 'data_request' | 'state_change' | 'trigger_automation'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+EntityReference:
+    entity=[Entity] '.' property=ID
+;
+
+FunctionParameter:
+    name=ID '=' value=ValueExpression
+;
+
+FunctionCall:
+    'Function' name=ID '(' parameters*=FunctionParameter[','] ')'
+;
+
+ValueExpression:
+    entityRef=EntityReference | functionCall=FunctionCall | literalValue=LiteralValue
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ConditionExpression:
+    logicalExpr=LogicalExpression
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('certificate:' certificate=STRING)
+        ('privateKey:' privateKey=STRING)
+    )#
+    'end'
+;
+
+Credentials:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+RepeatConfig:
+    'RepeatConfig'
+    (
+        ('times:' times=INT)?
+        ('interval:' interval=INT)?
+        ('until:' until=[Condition])?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('repeat:' repeat=RepeatConfig)?
+    )#
+    'end'
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('action:' action=[Action])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+RetryConfig:
+    'RetryConfig'
+    (
+        ('maxAttempts:' maxAttempts=INT)
+        ('interval:' interval=INT)
+        ('backoff:' backoff=BOOL)?
+    )#
+    'end'
+;
+
+ParameterValue:
+    EntityReference | FLOAT | INT | STRING | BOOL
+;
+
+ActionParameter:
+    name=ID '=' value=ParameterValue
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+CoapBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('confirmable:' confirmable=BOOL)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | HTTPBroker | CoapBroker
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('type:' authType=AuthType)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('timeout:' timeout=INT)?
+        ('active:' active=BOOL)?
+    )#
+    'end'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=INT)?
+        ('retry:' retry=RetryConfig)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' '-' conditions*=[Condition]['-'])
+        ('actions:' '-' actions*=[Action]['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

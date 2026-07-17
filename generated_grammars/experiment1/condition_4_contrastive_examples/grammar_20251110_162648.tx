@@ -1,0 +1,212 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDeclaration
+        authentication*=AuthenticationDeclaration  
+        entities*=EntityDeclaration
+        automations*=AutomationDeclaration
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)?
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'MQTT' | 'AMQP' | 'HTTP' | 'CoAP' | 'WebSocket'
+;
+
+AuthMethod:
+    'basic' | 'bearer' | 'oauth2' | 'certificate' | 'api_key'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'hybrid'
+;
+
+DataType:
+    'float' | 'int' | 'string' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+TriggerCondition:
+    'on_change' | 'on_value' | 'on_time' | 'on_event' | 'on_condition'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in' | 'matches'
+;
+
+LogLevel:
+    'info' | 'warn' | 'error' | 'debug'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+TimeUnit:
+    'second' | 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year'
+;
+
+BrokerDeclaration:
+    'broker' name=ID
+    (
+        ('type:' broker_type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('topics:' topics*=STRING[','])?
+        ('auth:' auth=[AuthenticationDeclaration])?
+    )#
+    'end'
+;
+
+AuthenticationDeclaration:
+    'auth' name=ID
+    (
+        ('method:' method=AuthMethod)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+PropertyDeclaration:
+    name=ID ':' data_type=DataType ('=' default_value=Value)?
+;
+
+BehaviorDeclaration:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('actions:' actions*=ActionDeclaration)
+    )#
+    'end'
+;
+
+EntityDeclaration:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerDeclaration])?
+        ('properties:' properties*=PropertyDeclaration)
+        ('behaviors:' behaviors*=BehaviorDeclaration)
+    )#
+    'end'
+;
+
+TimeCondition:
+    'time' comparison=ComparisonOperator value=TimeValue
+;
+
+EventCondition:
+    'event' event_name=STRING ('from' entity=[EntityDeclaration])?
+;
+
+SimpleCondition:
+    entity=[EntityDeclaration] '.' property=ID comparison=ComparisonOperator value=Value
+    | TimeCondition
+    | EventCondition
+;
+
+ConditionSpecification:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+SetAction:
+    'set' entity=[EntityDeclaration] '.' property=ID '=' value=Value
+;
+
+SendAction:
+    'send' message=STRING 'to' (entity=[EntityDeclaration] | broker=[BrokerDeclaration])
+;
+
+Parameter:
+    name=ID '=' value=Value
+;
+
+CallAction:
+    'call' entity=[EntityDeclaration] '.' behavior=ID ('with' parameters*=Parameter[','])?
+;
+
+DelayAction:
+    'delay' duration=INT ('seconds' | 'minutes' | 'hours')
+;
+
+LogAction:
+    'log' message=STRING ('level:' level=LogLevel)?
+;
+
+ActionDeclaration:
+    SetAction | SendAction | CallAction | DelayAction | LogAction
+;
+
+RepeatConfiguration:
+    count=INT 'times' | 'every' interval=INT ('seconds' | 'minutes' | 'hours')
+;
+
+ExecutionControl:
+    (
+        ('mode:' mode=ExecutionMode)
+        ('repeat:' repeat=RepeatConfiguration)?
+        ('timeout:' timeout=INT)?
+    )#
+;
+
+AutomationDeclaration:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('priority:' priority=INT)?
+        ('conditions:' conditions*=ConditionSpecification)
+        ('actions:' actions*=ActionDeclaration)
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+KeyValuePair:
+    key=STRING ':' value=Value
+;
+
+ObjectValue:
+    '{' pairs*=KeyValuePair[','] '}'
+;
+
+ArrayValue:
+    '[' elements*=Value[','] ']'
+;
+
+EntityReference:
+    entity=[EntityDeclaration] ('.' property=ID)?
+;
+
+RelativeTime:
+    amount=INT unit=TimeUnit ('ago' | 'from_now')?
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+    | timestamp=STRING
+    | 'now'
+    | relative=RelativeTime
+;
+
+Value:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue | EntityReference
+;

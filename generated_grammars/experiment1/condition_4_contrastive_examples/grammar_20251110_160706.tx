@@ -1,0 +1,250 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth_configs*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+        conditions*=ConditionDef
+        actions*=ActionDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'timestamp' | 'json'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=ValueExpression)?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'on_demand' | 'threshold_based'
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('broker:' broker=[BrokerConfig])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalExpression:
+    'interval' '(' seconds=INT ')'
+;
+
+TimeSpec:
+    CronExpression | IntervalExpression
+;
+
+EntityTrigger:
+    'entity:' entity=[EntityDef] 'property:' property=ID operator=ComparisonOperator value=ValueExpression
+;
+
+TimeTrigger:
+    'time:' time_spec=TimeSpec
+;
+
+EventTrigger:
+    'event:' event_name=STRING
+;
+
+TriggerExpression:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+EntityReference:
+    'entity:' entity=[EntityDef] 'property:' property=ID
+;
+
+EnvironmentVariable:
+    'env:' variable=ID
+;
+
+ValueExpression:
+    LiteralValue | EntityReference | EnvironmentVariable
+;
+
+ComparisonExpression:
+    '(' expression=LogicalExpression ')' |
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ConditionDef:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+EntityTarget:
+    'entity:' entity=[EntityDef] ('property:' property=ID)?
+;
+
+BrokerTarget:
+    'broker:' broker=[BrokerConfig] 'topic:' topic=STRING
+;
+
+ExternalTarget:
+    'url:' url=STRING ('method:' method=HTTPMethod)?
+;
+
+ActionTarget:
+    EntityTarget | BrokerTarget | ExternalTarget
+;
+
+ActionType:
+    'set_property' | 'send_message' | 'trigger_automation' | 'execute_script' | 'notify'
+;
+
+ParameterDef:
+    name=ID ':' value=ValueExpression
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' '-' parameters*=ParameterDef['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerExpression)
+        ('conditions:' '-' condition_refs*=[ConditionDef]['-'])?
+        ('actions:' '-' action_refs*=[ActionDef]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

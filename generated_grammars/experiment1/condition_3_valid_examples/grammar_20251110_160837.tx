@@ -1,0 +1,235 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication  
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+Property:
+    name=ID ':' datatype=PropertyDataType ('=' default=PropertyValue)?
+;
+
+PropertyDataType:
+    'int' | 'float' | 'str' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('actions:' '-' actions*=Action['-'])
+    )#
+    'end'
+;
+
+BehaviorTrigger:
+    'onUpdate' | 'onCommand' | 'onTimer' | 'onCondition'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' '-' conditions*=Condition['-'])
+        ('actions:' '-' actions*=Action['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('interval:' interval=INT)?
+        ('retries:' retries=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'scheduled' | 'delayed' | 'periodic'
+;
+
+SimpleCondition:
+    operand1=ConditionOperand operator=ComparisonOperator operand2=ConditionOperand
+;
+
+ConditionOperand:
+    EntityPropertyRef | LiteralValue | FunctionCall
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+FunctionCall:
+    name=ID '(' args*=ConditionOperand[','] ')'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startsWith' | 'endsWith'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+SetPropertyAction:
+    'SetProperty' target=EntityPropertyRef 'to' value=PropertyValue
+;
+
+SendMessageAction:
+    'SendMessage' 
+    (
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('payload:' payload=STRING)
+    )#
+;
+
+CallServiceAction:
+    'CallService'
+    (
+        ('service:' service=STRING)
+        ('method:' method=STRING)
+        ('params:' '-' params*=ServiceParam['-'])?
+    )#
+;
+
+ServiceParam:
+    name=ID ':' value=PropertyValue
+;
+
+DelayAction:
+    'Delay' duration=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'ms' | 's' | 'm' | 'h'
+;
+
+Action:
+    SetPropertyAction | SendMessageAction | CallServiceAction | DelayAction
+;

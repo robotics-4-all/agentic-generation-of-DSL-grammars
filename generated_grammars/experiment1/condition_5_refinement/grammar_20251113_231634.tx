@@ -1,0 +1,310 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (authentications*=Authentication)
+        (entities*=Entity)
+        (automations*=Automation)
+    )#
+;
+
+Import: 'import' importURI=STRING ('as' name=ID)?;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('clientId:' clientId=STRING)?
+        ('keepAlive:' keepAlive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('timeout:' timeout=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | ApiKeyAuth | CertificateAuth | TokenAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+        ('location:' location=AuthLocation)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('passphrase:' passphrase=STRING)?
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+        ('refreshUrl:' refreshUrl=STRING)?
+    )#
+    'end'
+;
+
+AuthLocation:
+    'header' | 'query' | 'body'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'gateway' | 'controller' | 'hybrid'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance' | 'unknown'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('dataType:' dataType=DataType)
+        ('unit:' unit=STRING)?
+        ('range:' range=ValueRange)?
+        ('readOnly:' readOnly=BOOL)?
+        ('required:' required=BOOL)?
+        ('defaultValue:' defaultValue=PropertyValue)?
+    )#
+    'end'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+ValueRange:
+    'Range' '(' min=NUMBER ',' max=NUMBER ')'
+;
+
+PropertyValue:
+    STRING | NUMBER | BOOL
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('action:' action=STRING)
+        ('parameters:' '-' parameters*=Parameter['-'])?
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+Parameter:
+    'Param' name=ID ':' value=PropertyValue
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('executionMode:' executionMode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | StateChangeTrigger
+;
+
+EventTrigger:
+    'Trigger<Event>'
+    (
+        ('entity:' entity=[Entity])
+        ('event:' event=STRING)
+        ('payload:' payload=STRING)?
+    )#
+;
+
+TimeTrigger:
+    'Trigger<Time>'
+    (
+        ('schedule:' schedule=STRING)
+        ('timezone:' timezone=STRING)?
+        ('repeat:' repeat=BOOL)?
+    )#
+;
+
+StateChangeTrigger:
+    'Trigger<StateChange>'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('fromState:' fromState=PropertyValue)?
+        ('toState:' toState=PropertyValue)
+    )#
+;
+
+ComparisonCondition:
+    'Condition<Comparison>'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+    )#
+;
+
+LogicalCondition:
+    'Condition<Logical>'
+    (
+        ('operator:' operator=LogicalOperator)
+        ('operands:' '-' operands*=Condition['-'])
+    )#
+;
+
+TimeCondition:
+    'Condition<Time>'
+    (
+        ('startTime:' startTime=STRING)?
+        ('endTime:' endTime=STRING)?
+        ('days:' '-' days*=STRING['-'])?
+    )#
+;
+
+Condition:
+    ComparisonCondition | LogicalCondition | TimeCondition
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!' | 'xor'
+;
+
+Action:
+    EntityAction | NotificationAction | ScriptAction
+;
+
+EntityAction:
+    'Action<Entity>'
+    (
+        ('entity:' entity=[Entity])
+        ('behavior:' behavior=[Behavior])
+        ('parameters:' '-' parameters*=Parameter['-'])?
+        ('delay:' delay=INT)?
+    )#
+;
+
+NotificationAction:
+    'Action<Notification>'
+    (
+        ('recipient:' recipient=STRING)
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('priority:' priority=NotificationPriority)?
+    )#
+;
+
+ScriptAction:
+    'Action<Script>'
+    (
+        ('language:' language=STRING)
+        ('script:' script=STRING)
+        ('timeout:' timeout=INT)?
+        ('async:' async=BOOL)?
+    )#
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook' | 'mqtt'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+Comment: CommentLine | CommentBlock;
+
+CommentLine: /\/\/.*?$/;
+
+CommentBlock: /\/\*(.|\n)*?\*\//;

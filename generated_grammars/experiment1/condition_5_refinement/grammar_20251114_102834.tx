@@ -1,0 +1,244 @@
+SmartEnvModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDef
+        authentication=AuthenticationConfig?
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+AuthType:
+    'basic' | 'token' | 'oauth' | 'certificate'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'gateway' | 'controller'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+EventType:
+    'change' | 'threshold' | 'timer' | 'external'
+;
+
+ActionType:
+    'set' | 'send' | 'notify' | 'execute' | 'log'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT | 'sunrise' | 'sunset'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BasicCredentials:
+    'basic'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenCredentials:
+    'token'
+    (
+        ('value:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertificateCredentials:
+    'certificate'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)?
+    )#
+    'end'
+;
+
+CredentialsDef:
+    BasicCredentials | TokenCredentials | CertificateCredentials
+;
+
+AuthenticationConfig:
+    'authentication'
+    (
+        ('type:' authType=AuthType)
+        ('credentials:' credentials=CredentialsDef)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('topics:' topics*=STRING[','])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)?
+        ('method:' method=HTTPMethod)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+ParameterDef:
+    name=ID '=' value=PropertyValue
+;
+
+ArgumentDef:
+    name=ID '=' value=PropertyValue
+;
+
+TriggerDef:
+    'on' eventType=EventType ('(' parameters*=ParameterDef[','] ')')?
+;
+
+ActionDef:
+    'do' actionType=ActionType ('(' arguments*=ArgumentDef[','] ')')?
+;
+
+BehaviorDef:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('action:' action=ActionDef)
+    )#
+    'end'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerDef])
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('location:' location=STRING)?
+    )#
+    'end'
+;
+
+EntityCondition:
+    entity=[EntityDef] '.' property=ID comparison=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparison=ComparisonOperator timeValue=TimeValue
+;
+
+ValueCondition:
+    leftValue=PropertyValue comparison=ComparisonOperator rightValue=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+NestedCondition:
+    '(' condition=Condition ')'
+;
+
+ConditionExpression:
+    SimpleCondition | NestedCondition
+;
+
+Condition:
+    left=ConditionExpression (operator=LogicalOperator right=ConditionExpression)*
+;
+
+ConditionGroup:
+    '(' condition=Condition ')' | condition=Condition
+;
+
+ConditionDef:
+    ConditionGroup
+;
+
+ActionParameter:
+    name=ID '=' value=PropertyValue
+;
+
+ActionExecution:
+    'execute' target=[EntityDef] '.' action=ID ('(' params*=ActionParameter[','] ')')?
+;
+
+ScheduleDef:
+    'every' interval=INT unit=TimeUnit | 'at' time=TimeValue | 'cron' expression=STRING
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions*=ConditionDef)?
+        ('actions:' actions*=ActionExecution)?
+        ('schedule:' schedule=ScheduleDef)?
+    )#
+    'end'
+;

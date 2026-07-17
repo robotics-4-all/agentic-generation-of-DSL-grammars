@@ -1,0 +1,306 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+        behaviors*=Behavior
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    HTTPBroker | WebSocketBroker | MQTTBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=HeaderMap)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+WebSocketBroker:
+    'Broker<WebSocket>' name=ID
+    (
+        ('url:' url=STRING)
+        ('protocol:' protocol=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderMap:
+    '{' items*=HeaderItem[','] '}'
+;
+
+HeaderItem:
+    key=STRING ':' value=STRING
+;
+
+Authentication:
+    KeyAuth | TokenAuth | BasicAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+KeyAuth:
+    'Auth<Key>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=KeyLocation)
+    )#
+    'end'
+;
+
+KeyLocation:
+    'header' | 'query' | 'body'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=[Behavior]['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+Behavior:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('response:' response=ResponseAction)
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+TriggerEvent:
+    PropertyChangeEvent | TimeEvent | ExternalEvent
+;
+
+PropertyChangeEvent:
+    'property_change' '(' property=[Property] ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+TimeEvent:
+    'time_event' '(' schedule=TimeSchedule ')'
+;
+
+ExternalEvent:
+    'external_event' '(' eventId=STRING ')'
+;
+
+TimeSchedule:
+    CronExpression | IntervalExpression
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalExpression:
+    'interval' '(' duration=FLOAT ',' unit=TimeUnit ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ResponseAction:
+    PropertyUpdateAction | NotificationAction | CommandAction
+;
+
+PropertyUpdateAction:
+    'update_property' '(' property=[Property] ',' value=PropertyValue ')'
+;
+
+NotificationAction:
+    'send_notification' '(' message=STRING (',' target=STRING)? ')'
+;
+
+CommandAction:
+    'execute_command' '(' command=STRING (',' parameters=ObjectValue)? ')'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('conditions:' '-' conditionRefs*=[Condition]['-'])
+        ('actions:' '-' actionRefs*=[Action]['-'])
+        ('execution:' executionMode=ExecutionMode)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('timeout:' timeout=FLOAT)?
+        ('retry:' retryCount=INT)?
+    )#
+    'end'
+;
+
+ConditionExpression:
+    left=SimpleCondition (logicalOp=LogicalOperator right=ConditionExpression)*
+;
+
+SimpleCondition:
+    entityRef=EntityPropertyRef operator=ComparisonOperator value=ConditionValue
+;
+
+EntityPropertyRef:
+    entityName=ID '.' propertyName=ID
+;
+
+ConditionValue:
+    PropertyValue | EntityPropertyRef
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' parameters=ObjectValue)?
+        ('delay:' delay=FLOAT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'property_update' | 'command_execution' | 'notification' | 'api_call'
+;
+
+ActionTarget:
+    EntityTarget | BrokerTarget | ExternalTarget
+;
+
+EntityTarget:
+    'entity' '(' entityRef=[Entity] ('.' propertyRef=ID)? ')'
+;
+
+BrokerTarget:
+    'broker' '(' brokerRef=[MessageBroker] ',' topic=STRING ')'
+;
+
+ExternalTarget:
+    'external' '(' endpoint=STRING ')'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

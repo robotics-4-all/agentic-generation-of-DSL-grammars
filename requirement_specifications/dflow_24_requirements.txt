@@ -1,0 +1,24 @@
+R1 - The grammar should support trainable entity definitions with a name and comma-separated example words for domain-specific entities that need training.
+R2 - The grammar should support pretrained entity types from spacy including PERSON, NORP, FAC, ORG, GPE, LOC, PRODUCT, EVENT, WORK_OF_ART, LAW, LANGUAGE, DATE, TIME, PERCENT, MONEY, QUANTITY, ORDINAL, and CARDINAL.
+R3 - The grammar should support synonym definitions with a name and comma-separated words that map to the same value.
+R4 - The grammar should support external HTTP service definitions (EServiceHTTP) with name, verb (GET, POST, PUT), host, optional port, and optional path properties.
+R5 - The grammar should support global slot definitions with name, type (int, float, str, bool, list, dict), and optional default value for global scope variables.
+R6 - The grammar should support intent trigger definitions with a name and training phrases that can include plain strings, trainable entity references (TE:), pretrained entity references (PE:) with optional example words in brackets, and synonym references (S:).
+R7 - The grammar should support event trigger definitions with a name and URI for external triggers such as IoT events or notifications.
+R8 - The grammar should support dialogue definitions with a name, list of trigger references to activate on, and list of responses (ActionGroups or Forms).
+R9 - The grammar should support ActionGroup definitions containing a sequence of actions: Speak actions with text, FireEvent actions with URI and message, RESTCall actions referencing external services with query/header/path/body parameters and optional response filtering, SetFSlot actions to set form slot values, and SetGSlot actions to set global slot values.
+R10 - The grammar should support Form definitions for collecting information with form parameters (slots) that have name, type (int, float, str, bool, list, dict), and source which can be HRI (asking user with text and optional entity/intent extraction) or EService call results.
+R11 - The grammar should support parameter values as literals (int, float, string, bool), lists, dictionaries, form parameter references with optional indexing, global slot references with optional indexing, and environment properties (user or system).
+R12 - The grammar should support user environment properties: NAME, SURNAME, AGE, EMAIL, PHONE, CITY, ADDRESS accessible via USER: prefix.
+R13 - The grammar should support system environment properties: TIME, LOCATION, RANDOM_INT, RANDOM_FLOAT accessible via SYSTEM: prefix.
+R14 - The grammar should support text composition in Speak actions and form questions combining string literals, form parameter references, global slot references, and environment properties.
+R15 - The grammar should support Slack connector configuration with token, channel, and signing_secret properties.
+R16 - The grammar should support Telegram connector configuration with token, verify, and webhook_url properties.
+R17 - The grammar should support access control role definitions with comma-separated role names and a mandatory default role for unauthenticated users.
+R18 - The grammar should support user-role assignments mapping role names to comma-separated user identifiers (emails).
+R19 - The grammar should support policy definitions with name, list of action names the policy applies to (on:), and list of roles allowed to execute those actions (roles:).
+R20 - The grammar should support inline role-based policies on individual actions within ActionGroups using [roles=role_name] syntax.
+R21 - The grammar should support authentication method configuration with options: slot (using slot content), user_id (using sender_id), slack (using Slack email), or telegram (using Telegram email), with optional slot_name for slot authentication.
+R22 - The grammar should support optional path definition for loading user-role mappings from an external file in JSON format.
+R23 - The grammar should support access control definition combining roles, users (optional if using path), policies, optional path, and authentication method.
+R24 - The grammar should support a model structure that can include entities section, synonyms section, global slots (gslots) section, triggers section, dialogues section, external services (eservices) section, connectors section, and access_controls section.

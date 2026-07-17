@@ -1,0 +1,230 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth=AuthConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('channel:' channel=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+AuthMethod:
+    'basic' | 'token' | 'oauth' | 'certificate'
+;
+
+Credentials:
+    BasicAuth | TokenAuth | OAuthAuth | CertAuth
+;
+
+BasicAuth:
+    'username:' username=STRING 'password:' password=STRING
+;
+
+TokenAuth:
+    'token:' token=STRING
+;
+
+OAuthAuth:
+    'client_id:' client_id=STRING 'client_secret:' client_secret=STRING
+;
+
+CertAuth:
+    'cert_path:' cert_path=STRING 'key_path:' key_path=STRING
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'motion' | 'door' | 'window' | 'hvac' | 'security'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+Property:
+    name=ID ':' datatype=PropertyType ('=' default=PropertyValue)?
+;
+
+PropertyType:
+    'string' | 'int' | 'float' | 'bool' | 'timestamp' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | 'null'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+BehaviorAction:
+    'toggle' | 'turn_on' | 'turn_off' | 'set_value' | 'read_value' | 'notify' | 'alert'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('mode:' mode=ExecutionMode)?
+        ('delay:' delay=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+Trigger:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+TimeTrigger:
+    'time' '(' time=TimeSpec ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[Entity] 'from' from_state=STRING 'to' to_state=STRING ')'
+;
+
+EventTrigger:
+    'event' '(' event_type=STRING ('data:' data=EventData)? ')'
+;
+
+TimeSpec:
+    'at' time=STRING | 'every' interval=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'second' | 'minute' | 'hour' | 'day' | 'week' | 'month'
+;
+
+EventData:
+    '{' items*=EventDataItem[','] '}'
+;
+
+EventDataItem:
+    key=STRING ':' value=PropertyValue
+;
+
+SimpleCondition:
+    entity=[Entity] operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    EntityAction | NotificationAction | ServiceAction | DelayAction
+;
+
+EntityAction:
+    'entity' '(' target=[Entity] 'action:' action=BehaviorAction ('value:' value=PropertyValue)? ')'
+;
+
+NotificationAction:
+    'notify' '(' message=STRING ('target:' target=STRING)? ')'
+;
+
+ServiceAction:
+    'service' '(' service_name=STRING ('data:' data=ServiceData)? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+ServiceData:
+    '{' items*=ServiceDataItem[','] '}'
+;
+
+ServiceDataItem:
+    key=STRING ':' value=PropertyValue
+;

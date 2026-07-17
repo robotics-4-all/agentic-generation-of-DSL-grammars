@@ -1,0 +1,313 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HTTPHeader:
+    key=STRING ':' value=STRING
+;
+
+APIKeyLocation:
+    'header' | 'query' | 'body'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'timestamp' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | JSONValue
+;
+
+JSONValue:
+    '{' json_items*=JSONItem[','] '}'
+;
+
+JSONItem:
+    key=STRING ':' value=PropertyValue
+;
+
+PropertyConstraints:
+    constraint_items*=ConstraintItem[',']
+;
+
+ConstraintItem:
+    RangeConstraint | EnumConstraint | PatternConstraint
+;
+
+RangeConstraint:
+    'range' '[' min_value=NUMBER ',' max_value=NUMBER ']'
+;
+
+EnumConstraint:
+    'enum' '[' enum_values*=PropertyValue[','] ']'
+;
+
+PatternConstraint:
+    'pattern' pattern=STRING
+;
+
+BehaviorType:
+    'publish' | 'subscribe' | 'request' | 'response' | 'trigger' | 'schedule'
+;
+
+BehaviorParam:
+    param_name=ID '=' param_value=PropertyValue
+;
+
+Location:
+    'Location' '(' x=NUMBER ',' y=NUMBER (',' z=NUMBER)? ')'
+;
+
+EntityMetadata:
+    meta_key=STRING ':' meta_value=PropertyValue
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'startswith' | 'endswith'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)? ('(' constraints=PropertyConstraints ')')?
+;
+
+Behavior:
+    name=ID ':' behavior_type=BehaviorType ('(' behavior_params*=BehaviorParam[','] ')')?
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=APIKeyLocation)
+        ('parameter:' parameter=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers*=HTTPHeader)*
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] ',' event_type=STRING (',' event_data=PropertyValue)? ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+ValueExpression:
+    PropertyReference | PropertyValue
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+    | '(' condition_expr=ConditionExpression ')'
+    | 'not' condition_expr=ConditionExpression
+;
+
+AndExpression:
+    left=ComparisonExpression (operator='and' right=ComparisonExpression)*
+;
+
+OrExpression:
+    left=AndExpression (operator='or' right=AndExpression)*
+;
+
+ConditionExpression:
+    or_expr=OrExpression
+;
+
+Condition:
+    condition_expr=ConditionExpression
+;
+
+ActionParameter:
+    param_name=ID ':' param_value=PropertyValue
+;
+
+PublishAction:
+    'Publish' '(' broker=[MessageBroker] ',' topic=STRING ',' message=PropertyValue ')'
+;
+
+CallAction:
+    'Call' '(' entity=[Entity] ',' method=ID (',' parameters*=ActionParameter[','])? ')'
+;
+
+SetPropertyAction:
+    'SetProperty' '(' entity=[Entity] ',' property=ID ',' value=PropertyValue ')'
+;
+
+DelayAction:
+    'Delay' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+Action:
+    PublishAction | CallAction | SetPropertyAction | DelayAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('properties:' properties*=Property)*
+        ('behaviors:' behaviors*=Behavior)*
+        ('location:' location=Location)?
+        ('status:' status=EntityStatus)?
+        ('metadata:' entity_metadata*=EntityMetadata)*
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions*=Condition)*
+        ('actions:' actions*=Action)*
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;

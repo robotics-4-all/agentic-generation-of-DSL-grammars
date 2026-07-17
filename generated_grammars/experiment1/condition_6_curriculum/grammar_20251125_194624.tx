@@ -1,0 +1,255 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'timestamp'
+;
+
+DictItem:
+    key=STRING ':' value=PropertyValue
+;
+
+DictValue:
+    '{' items*=DictItem[','] '}'
+;
+
+ListValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ListValue | DictValue
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+ParameterDef:
+    name=ID ':' param_type=DataType
+;
+
+CapabilityDef:
+    name=ID '(' parameters*=ParameterDef[','] ')'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+FixedTimeSchedule:
+    'at' '(' time=STRING ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | FixedTimeSchedule
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonCondition:
+    entity=[EntityDef] '.' property=ID comparator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparator=ComparisonOperator value=STRING
+;
+
+StateCondition:
+    entity=[EntityDef] '.' property=ID 'is' value=PropertyValue
+;
+
+SimpleCondition:
+    ComparisonCondition | TimeCondition | StateCondition
+;
+
+ConditionExpr:
+    '(' condition=ConditionGroup ')' | SimpleCondition
+;
+
+ConditionGroup:
+    conditions+=ConditionExpr (operator=LogicalOperator conditions+=ConditionExpr)*
+;
+
+SetPropertyAction:
+    'SetProperty' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+CallMethodAction:
+    'CallMethod' '(' entity=[EntityDef] ',' method=ID (',' arguments*=PropertyValue[','])? ')'
+;
+
+SendMessageAction:
+    'SendMessage' '(' broker=[BrokerConfig] ',' topic=STRING ',' message=PropertyValue ')'
+;
+
+DelayAction:
+    'Delay' '(' duration=INT ')'
+;
+
+ActionDef:
+    SetPropertyAction | CallMethodAction | SendMessageAction | DelayAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

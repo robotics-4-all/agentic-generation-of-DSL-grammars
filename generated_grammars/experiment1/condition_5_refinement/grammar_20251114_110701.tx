@@ -1,0 +1,351 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (broker=BrokerConfig)?
+        (authentication=AuthenticationMech)?
+        (entities*=EntityDef)
+        (automations*=AutomationDecl)
+        (conditions*=ConditionSpec)
+        (actions*=ActionDef)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routingKey=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=PropertyList)?
+        ('timeout:' timeout=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+AuthenticationMech:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+        ('header:' headerName=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' certPath=STRING)
+        ('key_path:' keyPath=STRING)?
+        ('ca_path:' caPath=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' apiKey=STRING)
+        ('location:' location=APIKeyLocation)
+        ('name:' paramName=STRING)?
+    )#
+    'end'
+;
+
+APIKeyLocation:
+    'header' | 'query' | 'cookie'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('state:' state=EntityState)?
+        ('broker:' brokerRef=[BrokerConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+EntityState:
+    'online' | 'offline' | 'error' | 'maintenance' | 'unknown'
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=KeyValuePair[','] '}'
+;
+
+KeyValuePair:
+    key=STRING ':' value=PropertyValue
+;
+
+BehaviorDef:
+    name=ID ':' behavior=BehaviorType ('(' params=PropertyList ')')?
+;
+
+BehaviorType:
+    'read' | 'write' | 'notify' | 'execute' | 'subscribe' | 'publish'
+;
+
+PropertyList:
+    '{' items*=KeyValuePair[','] '}'
+;
+
+AutomationDecl:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerSpec)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionCall['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+TriggerSpec:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'on_event' '(' eventSource=STRING ',' eventType=STRING ')'
+;
+
+TimeTrigger:
+    'on_time' '(' schedule=TimeSchedule ')'
+;
+
+StateTrigger:
+    'on_state_change' '(' entity=[EntityDef] ',' property=ID ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+ExecutionControl:
+    'sequential' | 'parallel' | 'conditional' | 'retry'
+;
+
+ConditionSpec:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionGroup)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ConditionGroup:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionTerm:
+    '(' expression=ConditionGroup ')' | condition=PrimitiveCondition
+;
+
+PrimitiveCondition:
+    ComparisonCondition | ExistenceCondition | RangeCondition
+;
+
+ComparisonCondition:
+    left=ConditionOperand operator=ComparisonOperator right=ConditionOperand
+;
+
+ExistenceCondition:
+    operand=ConditionOperand operator=ExistenceOperator
+;
+
+RangeCondition:
+    operand=ConditionOperand 'in_range' '(' min=PropertyValue ',' max=PropertyValue ')'
+;
+
+ConditionOperand:
+    EntityPropertyRef | LiteralValue | FunctionCall
+;
+
+EntityPropertyRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+LiteralValue:
+    value=PropertyValue
+;
+
+FunctionCall:
+    function=FunctionName '(' args*=ConditionOperand[','] ')'
+;
+
+FunctionName:
+    'avg' | 'sum' | 'min' | 'max' | 'count' | 'now' | 'elapsed'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'starts_with' | 'ends_with'
+;
+
+ExistenceOperator:
+    'exists' | 'not_exists'
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=ActionTarget)?
+        ('parameters:' params=PropertyList)?
+        ('retry:' retry=RetryConfig)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'call_service' | 'send_notification' | 'log_event' | 'delay' | 'script'
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | NotificationTarget
+;
+
+EntityTarget:
+    'entity' '(' entity=[EntityDef] ',' property=ID? ')'
+;
+
+ServiceTarget:
+    'service' '(' service=STRING ',' method=STRING? ')'
+;
+
+NotificationTarget:
+    'notification' '(' channel=STRING ',' recipient=STRING? ')'
+;
+
+ActionCall:
+    action=[ActionDef] ('(' arguments=PropertyList ')')?
+;
+
+RetryConfig:
+    'retry' '(' attempts=INT ',' delay=INT ',' backoff=BackoffStrategy? ')'
+;
+
+BackoffStrategy:
+    'linear' | 'exponential' | 'fixed'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

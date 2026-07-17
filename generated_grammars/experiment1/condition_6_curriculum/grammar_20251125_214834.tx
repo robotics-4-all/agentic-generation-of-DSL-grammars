@@ -1,0 +1,209 @@
+SmAutoModel:
+    imports*=Import
+    (metadata=Metadata)?
+    brokers*=BrokerDef
+    entities*=EntityDef
+    automations*=AutomationDef
+;
+
+Import:
+    'import' importURI=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=AuthDef)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthDef)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthDef)?
+    )#
+    'end'
+;
+
+AuthDef:
+    PlainAuth | TokenAuth | CertAuth
+;
+
+PlainAuth:
+    'PlainAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+    )#
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)?
+    )#
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerDef])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service'
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=ValueDef)?
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json'
+;
+
+ValueDef:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDef:
+    name=ID '(' parameters*=ParameterDef[','] ')'
+;
+
+ParameterDef:
+    name=ID ':' dataType=DataType
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' condition=ConditionDef)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('retries:' retries=INT)?
+    )#
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled'
+;
+
+ConditionDef:
+    logicalExpr=LogicalExpression
+;
+
+LogicalExpression:
+    left=LogicalTerm (operator=LogicalOperator right=LogicalTerm)*
+;
+
+LogicalTerm:
+    '(' expr=LogicalExpression ')' | comparison=ComparisonExpression
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonExpression:
+    left=PropertyRef operator=ComparisonOperator right=ValueRef
+;
+
+PropertyRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+ValueRef:
+    value=ValueDef | propertyRef=PropertyRef
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+ActionDef:
+    SetPropertyAction | CallBehaviorAction | SendMessageAction
+;
+
+SetPropertyAction:
+    'SetProperty' target=PropertyRef '=' value=ValueRef
+;
+
+CallBehaviorAction:
+    'CallBehavior' entity=[EntityDef] '.' behavior=ID '(' arguments*=ValueRef[','] ')'
+;
+
+SendMessageAction:
+    'SendMessage' broker=[BrokerDef] topic=STRING payload=ValueRef
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

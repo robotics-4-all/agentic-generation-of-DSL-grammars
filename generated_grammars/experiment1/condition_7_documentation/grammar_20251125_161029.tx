@@ -1,0 +1,265 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'motion' | 'door' | 'window' | 'other'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action=STRING
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('from:' fromState=PropertyValue)?
+        ('to:' toState=PropertyValue)
+        ('for:' duration=INT)?
+    )#
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('at:' time=STRING)?
+        ('cron:' cronExpr=STRING)?
+        ('interval:' interval=INT)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('data:' data=STRING)?
+    )#
+;
+
+Trigger:
+    StateTrigger | TimeTrigger | EventTrigger
+;
+
+ComparisonOperator:
+    'eq' | 'ne' | 'gt' | 'ge' | 'lt' | 'le' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Weekday:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+StateCondition:
+    'StateCondition'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('state:' state=PropertyValue)
+        ('operator:' operator=ComparisonOperator)?
+    )#
+;
+
+TimeCondition:
+    'TimeCondition'
+    (
+        ('before:' before=STRING)?
+        ('after:' after=STRING)?
+        ('weekday:' weekday=Weekday)?
+    )#
+;
+
+NumericCondition:
+    'NumericCondition'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=FLOAT)
+        ('operator:' operator=ComparisonOperator)
+    )#
+;
+
+LogicalCondition:
+    'LogicalCondition'
+    (
+        ('operator:' operator=LogicalOperator)
+        ('conditions:' '-' conditions*=Condition['-'])
+    )#
+;
+
+Condition:
+    StateCondition | TimeCondition | NumericCondition | LogicalCondition
+;
+
+ServiceAction:
+    'ServiceAction'
+    (
+        ('entity:' entity=[Entity])
+        ('service:' service=STRING)
+        ('data:' data=STRING)?
+    )#
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+    )#
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('target:' target=STRING)?
+        ('priority:' priority=STRING)?
+    )#
+;
+
+SceneAction:
+    'SceneAction'
+    (
+        ('scene:' scene=STRING)
+    )#
+;
+
+Action:
+    ServiceAction | DelayAction | NotificationAction | SceneAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('mode:' mode=AutomationMode)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

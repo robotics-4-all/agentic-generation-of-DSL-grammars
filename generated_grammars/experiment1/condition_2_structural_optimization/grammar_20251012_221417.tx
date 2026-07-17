@@ -1,0 +1,227 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+HTTPHeader:
+    key=STRING ':' value=STRING
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+    )#
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers*=HTTPHeader)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+PropertyTrigger:
+    'property_change' '(' property=ID ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TimeTrigger:
+    'timer' '(' interval=INT unit=TimeUnit ')'
+;
+
+EventTrigger:
+    'event' '(' event_name=STRING ')'
+;
+
+Trigger:
+    PropertyTrigger | TimeTrigger | EventTrigger
+;
+
+PropertyAction:
+    'set_property' '(' entity=[Entity] ',' property=ID ',' value=PropertyValue ')'
+;
+
+MessageAction:
+    'send_message' '(' broker=[BrokerConfig] ',' message=STRING ')'
+;
+
+ServiceAction:
+    'call_service' '(' service_url=STRING ',' method=HTTPMethod ',' payload=STRING? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+Action:
+    PropertyAction | MessageAction | ServiceAction | DelayAction
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('actions:' actions*=Action)
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties*=Property)?
+        ('behaviors:' behaviors*=Behavior)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('priority:' priority=INT)?
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+ComparisonCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=TimeValue
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | '(' Condition ')'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions*=Condition)
+        ('actions:' actions*=Action)
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

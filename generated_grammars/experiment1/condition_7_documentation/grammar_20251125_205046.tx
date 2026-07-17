@@ -1,0 +1,187 @@
+SmartHomeModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=BrokerDef
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportStm:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    HTTPBroker | MQTTBroker
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('api_key:' api_key=STRING)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('topic_prefix:' topic_prefix=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerDef])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'light' | 'switch' | 'thermostat' | 'camera' | 'lock' | 'fan' | 'other'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+CapabilityDef:
+    name=ID '(' parameters*=ParameterDef[',']? ')'
+;
+
+ParameterDef:
+    name=ID ':' param_type=DataType
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('triggers:' '-' triggers*=TriggerDef['-'])
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])
+    )#
+    'end'
+;
+
+TriggerDef:
+    EntityStateTrigger | TimeTrigger | EventTrigger
+;
+
+EntityStateTrigger:
+    'trigger' entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'trigger' 'time' pattern=TimePattern
+;
+
+EventTrigger:
+    'trigger' 'event' event_name=STRING
+;
+
+TimePattern:
+    CronPattern | IntervalPattern
+;
+
+CronPattern:
+    'cron' expression=STRING
+;
+
+IntervalPattern:
+    'every' interval=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionDef:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or'
+;
+
+ActionDef:
+    EntityAction | ServiceAction | NotificationAction
+;
+
+EntityAction:
+    'action' entity=[EntityDef] '.' capability=ID '(' arguments*=ActionArgument[',']? ')'
+;
+
+ServiceAction:
+    'action' 'service' service_name=STRING '(' arguments*=ActionArgument[',']? ')'
+;
+
+NotificationAction:
+    'action' 'notify' message=STRING ('to' target=STRING)?
+;
+
+ActionArgument:
+    name=ID '=' value=ArgumentValue
+;
+
+ArgumentValue:
+    PropertyValue | EntityReference
+;
+
+EntityReference:
+    entity=[EntityDef] '.' property=ID
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

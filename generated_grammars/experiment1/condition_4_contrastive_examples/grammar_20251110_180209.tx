@@ -1,0 +1,310 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'virtual'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance' | 'unknown'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+TimeRange:
+    start_time=STRING '-' end_time=STRING
+;
+
+DayList:
+    '[' days+=DayOfWeek[','] ']'
+;
+
+ValueExpression:
+    FLOAT | INT | STRING | BOOL | EntityReference
+;
+
+EntityReference:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+Property:
+    name=STRING ':' value=ValueExpression
+;
+
+PropertyList:
+    '[' properties+=Property[','] ']'
+;
+
+Behavior:
+    name=STRING ':' implementation=STRING
+;
+
+BehaviorList:
+    '[' behaviors+=Behavior[','] ']'
+;
+
+CapabilityList:
+    '[' capabilities+=STRING[','] ']'
+;
+
+ComparisonCondition:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+;
+
+EntityCondition:
+    'EntityCondition'
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('property:' property=ID)
+        ('value:' value=ValueExpression)
+        ('operator:' operator=ComparisonOperator)
+    )#
+;
+
+TimeCondition:
+    'TimeCondition'
+    (
+        ('time_range:' time_range=TimeRange)
+        ('days:' days=DayList)?
+    )#
+;
+
+ConditionSpecification:
+    ComparisonCondition | EntityCondition | TimeCondition | '(' ConditionGroup ')'
+;
+
+ConditionGroup:
+    conditions+=ConditionSpecification (operator=LogicalOperator conditions+=ConditionSpecification)*
+;
+
+EntityTrigger:
+    'EntityTrigger'
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('property:' property=ID)
+        ('condition:' condition=ComparisonCondition)
+    )#
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=STRING)
+        ('repeat:' repeat=BOOL)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event_type:' event_type=STRING)
+        ('source:' source=STRING)?
+    )#
+;
+
+TriggerCondition:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('command:' command=STRING)
+        ('parameters:' parameters=PropertyList)?
+    )#
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('recipient:' recipient=STRING)
+        ('channel:' channel=STRING)?
+    )#
+;
+
+ScriptAction:
+    'ScriptAction'
+    (
+        ('script_path:' script_path=STRING)
+        ('parameters:' parameters=PropertyList)?
+    )#
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+ActionDefinition:
+    EntityAction | NotificationAction | ScriptAction | DelayAction
+;
+
+ActionList:
+    '[' actions+=ActionDefinition[','] ']'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('priority:' priority=INT)?
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+        ('parallel:' parallel=BOOL)?
+    )#
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=PropertyList)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+        ('capabilities:' capabilities=CapabilityList)?
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' actions=ActionList)
+        ('execution:' execution=ExecutionControl)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

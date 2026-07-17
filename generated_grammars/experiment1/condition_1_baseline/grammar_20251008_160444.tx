@@ -1,0 +1,303 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=BrokerConfig)*
+    (auth*=AuthenticationConfig)*
+    (entities*=Entity)*
+    (automations*=AutomationRule)*
+    (conditions*=ConditionSpec)*
+    (actions*=ActionDef)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=PropertyList)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('status:' status=EntityStatus)?
+        ('capabilities:' capabilities=CapabilityList)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+PropertyList:
+    '[' properties*=Property[','] ']'
+;
+
+Property:
+    name=ID ':' value=PropertyValue
+;
+
+PropertyValue:
+    STRING | NUMBER | BOOL | PropertyList | PropertyMap
+;
+
+PropertyMap:
+    '{' items*=PropertyMapItem[','] '}'
+;
+
+PropertyMapItem:
+    key=STRING ':' value=PropertyValue
+;
+
+BehaviorList:
+    '[' behaviors*=Behavior[','] ']'
+;
+
+Behavior:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=PropertyList ')')?
+;
+
+BehaviorType:
+    'periodic' | 'triggered' | 'conditional' | 'scheduled' | 'reactive'
+;
+
+CapabilityList:
+    '[' capabilities*=STRING[','] ']'
+;
+
+AutomationRule:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerSpec)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' actions=ActionGroup)
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+TriggerSpec:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] ',' event_type=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] ',' state_condition=StateCondition ')'
+;
+
+TimeSchedule:
+    CronExpression | IntervalExpression | AtTimeExpression
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalExpression:
+    'interval' '(' duration=NUMBER ',' unit=TimeUnit ')'
+;
+
+AtTimeExpression:
+    'at' '(' time=STRING ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+StateCondition:
+    property=STRING operator=ComparisonOperator value=PropertyValue
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry=RetryConfig)?
+        ('timeout:' timeout=NUMBER)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+RetryConfig:
+    'Retry' '(' attempts=INT ',' delay=NUMBER ')'
+;
+
+ConditionSpec:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionGroup:
+    conditions+=ConditionExpression (logical_op=LogicalOperator conditions+=ConditionExpression)*
+;
+
+ConditionExpression:
+    '(' expr=ConditionGroup ')' | SimpleCondition
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=STRING operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=STRING
+;
+
+ValueCondition:
+    left=PropertyValue operator=ComparisonOperator right=PropertyValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[Entity])
+        ('parameters:' parameters=PropertyList)?
+        ('conditions:' conditions=ConditionGroup)?
+    )#
+    'end'
+;
+
+ActionGroup:
+    '[' actions*=ActionReference[','] ']'
+;
+
+ActionReference:
+    action=[ActionDef] ('(' parameters=PropertyList ')')?
+;
+
+ActionType:
+    'control' | 'notify' | 'configure' | 'monitor' | 'execute'
+;

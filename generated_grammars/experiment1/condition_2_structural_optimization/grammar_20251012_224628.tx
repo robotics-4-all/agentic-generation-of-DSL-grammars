@@ -1,0 +1,261 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=PropertyList)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'system' | 'virtual'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | PropertyList
+;
+
+Property:
+    name=ID ':' value=PropertyValue
+;
+
+PropertyList:
+    '[' properties*=Property[','] ']'
+;
+
+Behavior:
+    name=ID '(' parameters=PropertyList? ')'
+;
+
+BehaviorList:
+    '[' behaviors*=Behavior[','] ']'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])
+        ('properties:' properties=PropertyList)?
+        ('behaviors:' behaviors=BehaviorList)?
+        ('state:' state=STRING)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'on_event' '(' event=STRING (',' entity=[Entity])? ')'
+;
+
+TimeTrigger:
+    'on_time' '(' schedule=STRING ')'
+;
+
+StateTrigger:
+    'on_state' '(' entity=[Entity] ',' state=STRING ')'
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('repeat:' repeat=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID comparison=ComparisonOperator value=PropertyValue
+;
+
+ConditionTerm:
+    SimpleCondition | '(' expression=ConditionExpression ')'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionRef:
+    condition=[Condition] | inline=ConditionExpression
+;
+
+ConditionList:
+    '[' conditions*=ConditionRef[','] ']'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+InlineAction:
+    target=[Entity] '.' operation=ID '(' parameters=PropertyList? ')'
+;
+
+ActionRef:
+    action=[Action] | inline=InlineAction
+;
+
+ActionList:
+    '[' actions*=ActionRef[','] ']'
+;
+
+ActionType:
+    'control' | 'notify' | 'log' | 'trigger' | 'custom'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' type=ActionType)
+        ('target:' target=[Entity])?
+        ('operation:' operation=STRING)
+        ('parameters:' parameters=PropertyList)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionList)?
+        ('actions:' actions=ActionList)
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

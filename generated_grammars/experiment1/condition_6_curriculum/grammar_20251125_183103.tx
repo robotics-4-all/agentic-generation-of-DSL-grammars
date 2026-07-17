@@ -1,0 +1,224 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseurl:' baseurl=STRING)
+        ('timeout:' timeout=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('certfile:' certfile=STRING)
+        ('keyfile:' keyfile=STRING)
+        ('cafile:' cafile=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'other'
+;
+
+PropertyDef:
+    name=ID ':' ptype=PropertyType ('=' default=PropertyValue)?
+;
+
+PropertyType:
+    'str' | 'int' | 'float' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDef:
+    name=ID ':' btype=BehaviorType
+;
+
+BehaviorType:
+    'readonly' | 'writable' | 'trigger'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' condition=ConditionExpr)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOp right=ConditionTerm)*
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpr ')' | condition=Condition
+;
+
+Condition:
+    PropertyCondition | TimeCondition | StateCondition
+;
+
+PropertyCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOp value=TimeValue
+;
+
+StateCondition:
+    entity=[EntityDef] operator=StateOp state=STRING
+;
+
+TimeValue:
+    TIME | 'sunrise' | 'sunset' | 'dawn' | 'dusk'
+;
+
+LogicalOp:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+StateOp:
+    'is' | 'is_not' | 'changed_to' | 'changed_from'
+;
+
+ActionDef:
+    SetAction | CallAction | NotifyAction | DelayAction
+;
+
+SetAction:
+    'set' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+CallAction:
+    'call' entity=[EntityDef] '.' method=ID ('(' params*=ActionParam[','] ')')?
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ActionParam:
+    name=ID '=' value=PropertyValue
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('max_runs:' max_runs=INT)?
+        ('cooldown:' cooldown=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'once' | 'repeat' | 'continuous'
+;
+
+TIME: /([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/;

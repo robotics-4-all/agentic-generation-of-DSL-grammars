@@ -1,0 +1,283 @@
+SmAutoModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (entities*=Entity)
+        (automations*=Automation)
+        (conditions*=Condition)
+        (actions*=Action)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)?
+    )#
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'speaker' | 'other'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behavior:
+    name=ID ':' action=[Action]
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('mode:' mode=AutomationMode)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('time:' time=TIME)
+        ('days:' days*=DayOfWeek[','])?
+    )#
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('from:' fromValue=PropertyValue)?
+        ('to:' toValue=PropertyValue)
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('data:' data=PropertyValue)?
+    )#
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+AutomationMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionTerm:
+    '(' expression=ConditionExpression ')' |
+    SimpleCondition
+;
+
+SimpleCondition:
+    NumericCondition | StringCondition | BooleanCondition | TimeCondition
+;
+
+NumericCondition:
+    entity=[Entity] '.' property=ID operator=NumericOperator value=NUMBER
+;
+
+StringCondition:
+    entity=[Entity] '.' property=ID operator=StringOperator value=STRING
+;
+
+BooleanCondition:
+    entity=[Entity] '.' property=ID operator=BooleanOperator value=BOOL
+;
+
+TimeCondition:
+    'time' operator=TimeOperator value=TIME
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+NumericOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+StringOperator:
+    '==' | '!=' | 'contains' | 'startswith' | 'endswith'
+;
+
+BooleanOperator:
+    '==' | '!='
+;
+
+TimeOperator:
+    'before' | 'after' | 'at' | 'between'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_state' | 'call_service' | 'send_notification' | 'delay' | 'script' | 'scene'
+;
+
+ActionParameter:
+    name=ID ':' value=ParameterValue
+;
+
+ParameterValue:
+    FLOAT | INT | STRING | BOOL | EntityReference
+;
+
+EntityReference:
+    entity=[Entity] ('.' property=ID)?
+;
+
+TIME:
+    /([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

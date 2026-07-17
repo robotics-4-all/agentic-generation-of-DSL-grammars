@@ -1,0 +1,1995 @@
+SIMPLE MODEL CREATION PROMPT
+
+You are an expert Domain Specific Language engineer. Your task is to read the grammar of a Domain Specific Language and create models from it. This is the Domain Specific Language textX Grammar:
+validated_textX_grammar
+
+These are some other validated example textX grammars along with some generated models. You are given this context so you can understand how syntactically correct models are created from textX grammars.
+
+GoalDSL Grammar:
+AreaGoal:
+RectangleAreaGoal |
+CircularAreaGoal |
+StraightLine |
+MovingAreaGoal |
+PolylineAreaGoal
+;
+RectangleAreaGoal:
+'Goal<RectangleArea>' name=ID
+(
+('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+('bottomLeftEdge:' bottomLeftEdge=Point )
+('lengthX:' lengthX=NUMBER)
+('lengthY:' lengthY=NUMBER)
+('tag:' tag=AreaGoalTag )
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)# // Any order
+'end'
+;
+PolylineAreaGoal:
+'Goal<PolylineArea>' name=ID
+(
+('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+('points:' '[' points+=Point[','] ']' )
+('tag:' tag=AreaGoalTag )
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)# // Any order
+'end'
+;
+MovingAreaGoal:
+'Goal<MovingArea>' name=ID
+(
+('movingEntity:' entity=[Entity:FQN|+pm:entities*])
+('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+('radius:' radius=NUMBER)
+('tag:' tag=AreaGoalTag)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)# // Any order
+'end'
+;
+CircularAreaGoal:
+'Goal<CircularArea>' name=ID
+(
+('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+('center:' center=Point)
+('radius:' radius=NUMBER)
+('tag:' tag=AreaGoalTag)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+StraightLine:
+'Goal<StraightLine>' name=ID
+(
+('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+('startPoint:' startPoint=Point)
+('endPoint:' endPoint=Point)
+('tag:' tag=AreaGoalTag)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+AreaGoalTag: 'ENTER' | 'EXIT' | 'AVOID' | 'STEP';
+MessageBroker:
+AMQPBroker | MQTTBroker | RedisBroker
+;
+Authentication: AuthPlain | AuthApiKey | AuthCert;
+AuthPlain:
+'username' ':' username=STRING
+'password' ':' password=STRING
+;
+AuthApiKey:
+'key' ':' key=STRING
+;
+AuthCert:
+('cert' ':' cert=STRING) | ('certPath' ':' certPath=STRING)
+;
+AMQPBroker:
+'Broker<AMQP>' name=ID
+(
+('host:' host=STRING)
+('port:' port=INT)
+('vhost:' vhost=STRING)?
+('topicExchange:' topicE=STRING)?
+('rpcExchange:' rpcE=STRING)?
+('ssl' ':' ssl=BOOL)?
+('auth' ':' auth=Authentication)?
+)#
+'end'
+;
+MQTTBroker:
+'Broker<MQTT>' name=ID
+(
+('host:' host=STRING)
+('port:' port=INT)
+('ssl' ':' ssl=BOOL)?
+('basePath:' basePath=STRING)?
+('webPath:' webPath=STRING)?
+('webPort:' webPort=INT)?
+('auth' ':' auth=Authentication)?
+)#
+'end'
+;
+RedisBroker:
+'Broker<Redis>' name=ID
+(
+('host:' host=STRING)
+('port:' port=INT)
+('db:' db=INT)?
+('ssl' ':' ssl=BOOL)?
+('auth' ':' auth=Authentication)?
+)#
+'end'
+;
+RESTEndpoint:
+'RESTEndpoint' name=ID
+(
+('verb:' verb=RESTVerb)
+('host:' host=STRING)
+('port:' port=INT)
+('path:' path=STRING)
+('base_url:' baseUrl=STRING)?
+(
+'params:'
+('query:' '-' queryParams*=Property['-'])?
+('path:' '-' pathParams*=Property['-'])?
+('body:' '-' bodyParams*=Property['-'])?
+('headers:' '-' headers*=Property['-'])?
+)?
+)#
+'end'
+;
+RESTVerb:
+'GET' |
+'POST' |
+'PUT' |
+'DELETE'
+;
+// === Conditions ===
+TermPool:
+'TermPool' name=ID
+(
+conditions*=Condition
+)#
+'end'
+;
+Condition:
+r1=ConditionGroup (operator=LogicalOperator r2=ConditionGroup)*
+;
+ConditionGroup:
+'(' r=Condition ')'
+| PrimitiveCondition
+| MathExpression
+;
+PrimitiveCondition:
+BoolCondition |
+TimeCondition |
+NumericCondition |
+StringCondition |
+ListCondition |
+DictCondition
+;
+MathExpression:
+left=MathTerm (operator=PlusOrMinus right=MathTerm)*
+;
+MathTerm:
+left=MathFactor (operator=MulOrDiv right=MathFactor)*
+;
+MathFactor:
+(sign=PlusOrMinus)?
+(
+op=MathOperand | '(' op=MathExpression ')'
+)
+;
+MathOperand:
+(
+op=NUMBER |
+op=BuiltinNumericFunctions |
+op=AttributeRef
+)
+;
+AttributeRef:
+DictAttributeRef |
+ListAttributeRef |
+SimpleAttributeRef
+;
+SimpleAttributeRef:
+attribute=[Attribute:FQN|+m:entities.attributes]
+;
+DictAttributeRef:
+attribute=[Attribute:FQN|+pm:entities.attributes] (('[' key=STRING ']')*)?
+;
+ListAttributeRef:
+attribute=[Attribute:FQN|+pm:entities.attributes] (('[' index=INT ']')*)?
+;
+PlusOrMinus: '+' | '-';
+MulOrDiv: '*' | '/' ;
+NumericCondition:
+(operand1=MathExpression
+operator=NumericOperator
+operand2=MathExpression)
+;
+StringCondition:
+(operand1=AttributeRef
+operator=StringOperator
+(operand2=STRING | operand2=AttributeRef))
+;
+BoolCondition:
+(operand1=AttributeRef
+operator=BooleanOperator
+(operand2=BOOL | operand2=AttributeRef))
+;
+ListCondition:
+(operand1=AttributeRef
+operator=ListOperator
+(operand2=List | operand2=AttributeRef))
+;
+DictCondition:
+(operand1=AttributeRef
+operator=DictOperator
+(operand2=Dict | operand2=AttributeRef))
+;
+TimeCondition:
+(operand1=AttributeRef
+operator=TimeOperator
+operand2=AttributeRef)
+;
+StdAttr:
+'std' '(' attribute=MathOperand ',' size=INT ')'
+;
+VarAttr:
+'var' '(' attribute=MathOperand ',' size=INT ')'
+;
+MeanAttr:
+'mean' '(' attribute=MathOperand ',' size=INT ')'
+;
+MinAttr:
+'min' '(' attribute=MathOperand ',' size=INT ')'
+;
+MaxAttr:
+'max' '(' attribute=MathOperand ',' size=INT ')'
+;
+InRangeAttr:
+'inrange' '(' attribute=MathOperand ',' min=NUMBER ',' max=NUMBER ')'
+;
+BuiltinNumericFunctions:
+StdAttr |
+VarAttr |
+MeanAttr |
+MinAttr |
+MaxAttr |
+InRangeAttr
+;
+// Operators
+// SharedOperator: '==' | '!=' | 'is' | 'is not';
+StringOperator: '~' | '!~' | '==' | '!=' | 'is not' | 'is' | 'has' | 'in' | 'not in';
+NumericOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+LogicalOperator: 'and' | 'or' | 'not' | 'xor' | 'nor' | 'xnor' | 'nand';
+BooleanOperator: '==' | '!=' | 'is not' | 'is';
+ListOperator: '==' | '!=' | 'is' | 'is not' | 'in' | 'not in';
+DictOperator: '==' | '!=' | 'is' | 'is not';
+TimeOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+EntitySource:
+(ref=[MessageBroker]) |
+(ref=[RESTEndpoint])
+;
+/*
+EntitySource:
+BrokerSource |
+RestSource
+;
+BrokerSource:
+brokerRef=[MessageBroker] '@' uri=STRING
+;
+RestSource:
+endpointRef=[RESTEndpoint]
+;
+*/
+/*
+DBSQLSource:
+dbRef=[DBSQL] '@' query=STRING
+;
+DBNoSQLource:
+dbRef=[DBNoSQL] '@' collection=STRING ',' filter=STRING
+;
+*/
+Entity:
+'Entity' name=ID
+(
+('type:' etype=EntityType)
+('source:' source=EntitySource)
+('mode:' mode=EntityMode)?
+('freq:' mode=NUMBER)?
+('attributes:' '-' attributes*=Attribute['-'])?
+('uri:' uri=STRING)?
+('description:' description=STRING)?
+('compartments'
+entities*=Entity
+'end')?
+)#
+'end'
+;
+EntityType:
+'sensor' |
+'actuator' |
+'hybrid' |
+'robot' |
+'other'
+;
+EntityMode:
+'virtual' |
+'simulation' |
+'real' |
+'digitwin' |
+'other'
+;
+Attribute:
+name=ID ':' dtype=[DataType:FQN|+m:types*]
+( '('precision_x=INT (',' precision_y=INT)? ')' )?
+( '[' lower=MultiplicityBound (',' upper=MultiplicityBound )? ']' )?
+;
+EntityGoal:
+EntityStateChangeGoal |
+EntityStateConditionGoal |
+EntityPyConditionGoal |
+EntityAttrStreamGoal
+;
+EntityStateChangeGoal:
+'Goal<EntityStateChange>' name=ID
+(
+// ('entities:' '-' entities*=[Entity:FQN|+m:entities*]['-'])
+('entity:' entity=[Entity:FQN|+m:entities*])
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+EntityStateConditionGoal:
+'Goal<EntityStateCondition>' name=ID
+(
+('condition:' condition=Condition)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+EntityPyConditionGoal:
+'Goal<EntityPyCondition>' name=ID
+(
+('condition:' condition=STRING)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+/*
+EntityAttrStreamGoal:
+'Goal<EntityAttrStream>' name=ID
+(
+('streams:' '-' streams+=AttrStreamDefinition['-'])
+// ('strategy:' strategy=[EntityAttrStreamStrategy])
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+AttrStreamDefinition:
+attr=[Attribute:FQN|+pm:entities.attributes*] ':' '[' values+=BASETYPE[','] ']' '->' strategy=[EntityAttrStreamStrategy]
+;
+*/
+EntityAttrStreamGoal:
+'Goal<EntityAttrStream>' name=ID
+(
+('stream:' stream=AttrStreamDefinition)
+('strategy:' strategy=[EntityAttrStreamStrategy])
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+AttrStreamDefinition:
+attr=[Attribute:FQN|+pm:entities.attributes*] ':' '[' values+=BASETYPE[','] ']'
+;
+EntityAttrStreamStrategy:
+'ALL' |
+'NONE' |
+'AT_LEAST_ONE' |
+'JUST_ONE' |
+'EXACTLY_X' |
+'ALL_ORDERED' |
+'EXACTLY_X_ORDERED'
+;
+EntityStateTransitionGoal:
+'Goal<EntityStateTransition>' name=ID
+(
+('entity:' entity=[Entity:FQN|+m:entities*])
+('previous:' previous=Condition)
+('next:' next=Condition)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+PoseGoal:
+'Goal<Pose>' name=ID
+(
+('entity:' entity=[Entity:FQN|+pm:entities*])
+('orientation:' orientation=Orientation)
+('position:' position=Point)
+('maxDeviationPos:' maxDeviationPos=NUMBER)
+('maxDeviationOri:' maxDeviationOri=NUMBER)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+OrientationGoal:
+'Goal<Orientation>' name=ID
+(
+('entity:' entity=[Entity:FQN|+pm:entities*])
+('orientation:' orientation=Orientation)
+('maxDeviation:' maxDeviation=NUMBER)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+PositionGoal:
+'Goal<Position>' name=ID
+(
+('entity:' entity=[Entity:FQN|+pm:entities*])
+('position:' point=Point)
+('maxDeviation:' maxDeviation=NUMBER)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+TimeConstraint:
+type=TimeConstraintType '(' (comparator=ArithmeticComparator)? time=FLOAT ')'
+;
+ArithmeticComparator: '>' | '<' | '==' | '>=' | '<=';
+TimeConstraintType:
+'FROM_SCENARIO_START' |
+'FROM_GOAL_START' |
+'FOR_TIME' |
+'BETWEEN_GOALS_MIN' |
+'BETWEEN_GOALS_MAX'
+;
+TrajectoryGoal:
+StraightLineTrajectoryGoal |
+WaypointTrajectoryGoal
+;
+StraightLineTrajectoryGoal:
+'Goal<StraightLineTrajectory>' name=ID
+(
+('entity:' entity=[Entity:FQN|+pm:entities*])
+('startPoint:' startPoint=Point)
+('finishPoint:' finishPoint=Point)
+('maxDeviation:' maxDeviation=NUMBER)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+WaypointTrajectoryGoal:
+'Goal<WaypointTrajectory>' name=ID
+(
+('entity:' entity=[Entity:FQN|+pm:entities*])
+('points:' '[' points+=Point[','] ']')
+('maxDeviation:' maxDeviation=NUMBER)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+CurveTrajectoryGoal:
+'Goal<CurveTrajectoryGoal>' name=ID
+(
+('entity:' entity=[Entity:FQN|+pm:entities*])
+('startPoint:' startPoint=Point)
+('finishPoint:' finishPoint=Point)
+('maxDeviation:' maxDeviation=NUMBER)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+Time:
+hour=INT ':' minute=INT (':' second=INT)?
+;
+Date: month=INT ':' day=INT ':' year=INT;
+// Hours: /[0-2]?[0-9]?/;
+// Minutes: /[0-5][0-9]/;
+List:
+'[' items*=ListItem[','] ']'
+;
+ListItem:
+NUMBER | STRING | BOOL | List | Dict | OBJECT
+;
+Dict:
+'{' items*=DictItem[','] '}'
+;
+DictItem:
+name=STRING ':' value=DictType
+;
+DictType:
+NUMBER | STRING | BOOL | Dict | List | OBJECT
+;
+Description: /\#(.*?)$/;
+DataType: PrimitiveDataType | CustomDataType | Enumeration;
+CustomDataType:
+'DataType' name=ID
+(description=Description)?
+properties*=Property // Each Message has one or more properties.
+'end'
+;
+Enumeration:
+'Enum' name=ID
+(description=Description)?
+elements+=EnumerationElement
+'end'
+;
+EnumerationElement: name=STRING;
+// Primitive data types
+PrimitiveDataType:
+'type' name=ID
+;
+Property:
+ListProperty |
+SimpleProperty
+;
+SimpleProperty:
+name=ID ':' type=[DataType:FQN|+m:types] ('=' default=STRING)?
+;
+ListProperty:
+name=ID ':' type=[DataType:FQN|+m:types]'[' ( multiplicity=MultiplicityBound )? ']'
+;
+MultiplicityBound:
+INT | '*'
+;
+// Special types
+Point: Point2D | Point3D;
+Orientation: Orientation2D | Orientation3D;
+Point2D:
+'Point2D' '(' x=NUMBER ',' y=NUMBER ')'
+;
+Point3D:
+'Point3D' '(' x=NUMBER ',' y=NUMBER ',' z=NUMBER ')'
+;
+Orientation2D:
+'Orientation2D' '(' z=NUMBER ')'
+;
+Orientation3D:
+'Orientation3D' '(' x=NUMBER ',' y=NUMBER ',' z=NUMBER ')'
+;
+// Utilities ------------------------------------->
+FQN[noskipws]:
+/\s*/- ID ('.' ID)*
+;
+FQID[noskipws]:
+/\s*/-
+LID+['.']
+;
+// Language ID
+LID:
+// Forbid keywords as IDs for better error reporting.
+!Keyword ID
+;
+Import: 'import' importURI=FQN ('as' name=ID)?;
+Keyword:
+'import'
+;
+// Special rule for comments. Comments start with //
+Comment: CommentLine | CommentBlock ;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;
+MULTILINE_STRING: /\"\"\"(.|\n)*?\"\"\"/;
+// <-----------------------------------------------
+Goal:
+EntityGoal |
+AreaGoal |
+PoseGoal |
+PositionGoal |
+OrientationGoal |
+TrajectoryGoal |
+ComplexGoal |
+GoalRepeater |
+GTermGoal
+;
+ComplexGoal:
+'Goal<Complex>' name=ID
+(
+('goals:' '-' goals*=WeightedGoal['-'])
+('strategy:' algorithm=[ComplexGoalAlgorithmType])
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+('xAccomplished:' xAccomplished=INT)?
+)#
+'end'
+;
+ComplexGoalAlgorithmType:
+'ALL_ACCOMPLISHED' |
+'NONE_ACCOMPLISHED' |
+'AT_LEAST_ONE_ACCOMPLISHED' |
+'JUST_ONE_ACCOMPLISHED' |
+'EXACTLY_X_ACCOMPLISHED' |
+'ALL_ACCOMPLISHED_ORDERED' |
+'EXACTLY_X_ACCOMPLISHED_ORDERED'
+;
+// ======================================================================
+GTermGoal:
+'Goal<GTerm>' name=ID
+(
+('terms:' '-' terms*=GoalTermDef['-'])
+('operator:' operator=LogicalOperator)?
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+GoalTermDef:
+r1=GoalTermGroup (operator=LogicalOperator r2=GoalTermGroup)*
+;
+GoalReference:
+r=[Goal:FQN|+m:goals*]
+;
+GoalTermGroup:
+'(' r=GoalTermDef ')' |
+r=GoalReference
+;
+// ======================================================================
+GoalRepeater:
+'Goal<Repeater>' name=ID
+(
+('goal:' goal=[Goal:FQN|+m:goals*])
+('times:' times=INT)
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+)#
+'end'
+;
+WeightedGoal:
+goal=[Goal:FQN|+m:goals*] ('->' weight=FLOAT)?
+;
+GoalDSLModel:
+imports*=Import
+(metadata=Metadata)?
+(
+(rtmonitor=RTMonitor)?
+(brokers*=MessageBroker)
+(types*=CustomDataType)
+(entities*=Entity)
+(goals*=Goal)
+(restEndpoints*=RESTEndpoint)
+(scenarios*=Scenario)
+)#
+;
+Metadata:
+'Metadata'
+(
+('name:' name=ID)
+('version:' version=STRING)
+('author:' author=STRING)?
+('email:' email=STRING)?
+('description:' description=STRING)?
+'end'
+)#
+;
+RTMonitor:
+'RTMonitor'
+(
+('broker:' broker=[MessageBroker])
+('namespace:' ns=STRING)?
+('eventTopic:' eTopic=STRING)?
+('logsTopic:' lTopic=STRING)?
+'end'
+)#
+;
+Scenario:
+'Scenario' name=ID
+(
+('goals:' '-' goals*=WeightedGoal['-'])
+('antigoals:' '-' antigoals*=WeightedGoal['-'])?
+('fatals:' '-' fatals*=[Goal:FQN|+m:goals*]['-'])?
+('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+('concurrent:' concurrent=BOOL)?
+('tickFreq:' goalTickFreqHz=NUMBER)?
+('description:' description=STRING)?
+('namespace:' ns=STRING)?
+)#
+'end'
+;
+
+Goal DSL example models:
+Model 1: 
+Metadata
+name: bN7dq
+version: "0.1.0"
+author: "AUTHOR_NAME_HERE"
+email: "CONTACT_EMAIL_HERE"
+description: "BRIEF_DESCRIPTION"
+end
+Broker<MQTT> LocsysMQTT
+host: 'locsys.issel.ee.auth.gr'
+port: 8883
+ssl: true
+auth:
+username: '*****'
+password: '*****'
+end
+Broker<MQTT> LocalMQTT
+host: 'localhost'
+port: 1883
+auth:
+username: ''
+password: ''
+end
+Broker<Redis> LocalRedis
+host: 'localhost'
+port: 6379
+auth:
+username: ''
+password: ''
+end
+RTMonitor
+broker: LocalRedis
+eventTopic: "goaldsl.{U_ID}.event"
+logsTopic: "goaldsl.{U_ID}.log"
+end
+Entity keypad_state
+type: sensor
+uri: "streamsim.{UID}.world.world.actuator.switch.relay.keypad.state"
+source: LocalRedis
+freq: -1
+attributes:
+- state: int
+end
+Entity keypad_set
+type: actuator
+uri: "streamsim.{UID}.world.world.actuator.switch.relay.keypad.set"
+source: LocalRedis
+attributes:
+- state: int
+end
+Goal<EntityAttrStream> Password_Correct
+stream: keypad_set.state: [2, 9, 7, 5]
+strategy: ALL_ORDERED
+end
+Scenario Week_2_Task_7
+goals:
+- Password_Correct
+concurrent: False
+end
+
+Model 2:
+Metadata
+    name: KbQNL
+    version: "0.1.0"
+    author: "AUTHOR_NAME_HERE"
+    email: "CONTACT_EMAIL_HERE"
+    description: "BRIEF_DESCRIPTION"
+end
+
+Broker<MQTT> LocsysMQTT
+    host: 'locsys.issel.ee.auth.gr'
+    port: 8883
+    ssl: true
+    auth:
+        username: '*****'
+        password: '*****'
+end
+
+Broker<MQTT> LocalMQTT
+    host: 'localhost'
+    port: 1883
+    auth:
+        username: ''
+        password: ''
+end
+
+Broker<Redis> LocalRedis
+    host: 'localhost'
+    port: 6379
+    auth:
+        username: ''
+        password: ''
+end
+
+RTMonitor
+    broker: LocalRedis
+    eventTopic: "goaldsl.{U_ID}.event"
+    logsTopic: "goaldsl.{U_ID}.log"
+end
+
+Entity linear_1_data
+    type: sensor
+    uri: "streamsim.{UID}.world.world.sensor.alarm.linear_alarm.linear_1.data"
+    source: LocalRedis
+    freq: 5.0
+    attributes:
+        - value: float
+end
+
+Entity linear_4_data
+    type: sensor
+    uri: "streamsim.{UID}.world.world.sensor.alarm.linear_alarm.linear_4.data"
+    source: LocalRedis
+    freq: 1.0
+    attributes:
+        - value: float
+end
+
+Entity linear_2_data
+    type: sensor
+    uri: "streamsim.{UID}.world.world.sensor.alarm.linear_alarm.linear_2.data"
+    source: LocalRedis
+    freq: 2.0
+    attributes:
+        - value: float
+end
+
+Entity area_5_data
+    type: sensor
+    uri: "streamsim.{UID}.world.world.sensor.alarm.area_alarm.area_5.data"
+    source: LocalRedis
+    freq: 1.0
+    attributes:
+        - value: float
+end
+
+Entity area_6_data
+    type: sensor
+    uri: "streamsim.{UID}.world.world.sensor.alarm.area_alarm.area_6.data"
+    source: LocalRedis
+    freq: 1.0
+    attributes:
+        - value: float
+end
+
+Entity lamp_1_state
+    type: sensor
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_1.state"
+    source: LocalRedis
+    freq: -1
+    attributes:
+        - luminosity: str
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_2_state
+    type: sensor
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_2.state"
+    source: LocalRedis
+    freq: -1
+    attributes:
+        - luminosity: str
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_3_state
+    type: sensor
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_3.state"
+    source: LocalRedis
+    freq: -1
+    attributes:
+        - luminosity: str
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_4_state
+    type: sensor
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp-4.state"
+    source: LocalRedis
+    freq: -1
+    attributes:
+        - luminosity: str
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_5_state
+    type: sensor
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_5.state"
+    source: LocalRedis
+    freq: -1
+    attributes:
+        - luminosity: str
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity tesla_pose
+    type: sensor
+    uri: "streamsim.{UID}.tesla.pose"
+    source: LocalRedis
+    freq: -1.0
+    attributes:
+        - position: dict
+        - orientation: dict
+end
+
+Entity tesla_crash
+    type: sensor
+    uri: "streamsim.{UID}.tesla.crash"
+    source: LocalRedis
+    freq: -1.0
+    attributes:
+        - position: dict
+        - orientation: dict
+end
+
+Entity lamp_1_set
+    type: actuator
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_1.set"
+    source: LocalRedis
+    attributes:
+        - luminosity: float
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_2_set
+    type: actuator
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_2.set"
+    source: LocalRedis
+    attributes:
+        - luminosity: float
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_3_set
+    type: actuator
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_3.set"
+    source: LocalRedis
+    attributes:
+        - luminosity: float
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_4_set
+    type: actuator
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp-4.set"
+    source: LocalRedis
+    attributes:
+        - luminosity: float
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity lamp_5_set
+    type: actuator
+    uri: "streamsim.{UID}.world.world.actuator.visual.leds.lamp_5.set"
+    source: LocalRedis
+    attributes:
+        - luminosity: float
+        - r: float
+        - g: float
+        - b: float
+end
+
+Entity tesla_motion_set
+    type: actuator
+    uri: "streamsim.{UID}.tesla.actuator.motion.twist.tesla_skid_steer.set"
+    source: LocalRedis
+    attributes:
+        - linear: float
+        - angular: float
+end
+
+// ------------------- GOALS --------------------------------------
+// ----------------------------------------------------------------
+
+Goal<EntityPyCondition> Linear_1_Reached
+    condition:
+        "len(linear_1_data.value) > 0 and linear_1_data.value[0] == 'tesla'"
+end
+
+Goal<EntityPyCondition> Lamp_1_Open_For_10_Seconds
+    condition:
+        "lamp_1_set.luminosity > 0"
+    timeConstraints:
+        - FOR_TIME(10)
+end
+
+Goal<Complex> Checkpoint_1
+    goals:
+        - Linear_1_Reached
+        - Lamp_1_Open_For_10_Seconds
+    strategy: ALL_ACCOMPLISHED_ORDERED
+end
+
+Goal<EntityPyCondition> Linear_2_Reached
+    condition:
+        "len(linear_2_data.value) > 0 and linear_2_data.value[0] == 'tesla'"
+end
+
+Goal<EntityPyCondition> Lamp_2_Open_For_10_Seconds
+    condition:
+        "lamp_2_set.luminosity > 0"
+    timeConstraints:
+        - FOR_TIME(10)
+end
+
+Goal<Complex> Checkpoint_2
+    goals:
+        - Linear_2_Reached
+        - Lamp_2_Open_For_10_Seconds
+    strategy: ALL_ACCOMPLISHED_ORDERED
+end
+
+Goal<EntityPyCondition> Linear_3_Reached
+    condition:
+        "len(linear_4_data.value) > 0 and linear_4_data.value[0] == 'tesla'"
+end
+
+Goal<EntityPyCondition> Lamp_3_Open_For_10_Seconds
+    condition:
+        "lamp_3_set.luminosity > 0"
+    timeConstraints:
+        - FOR_TIME(10)
+end
+
+Goal<Complex> Checkpoint_3
+    goals:
+        - Linear_3_Reached
+        - Lamp_3_Open_For_10_Seconds
+    strategy: ALL_ACCOMPLISHED_ORDERED
+end
+
+Goal<EntityPyCondition> Area_1_Reached
+    condition:
+        "len(area_5_data.value) > 0 and area_5_data.value[0] == 'tesla'"
+end
+
+Goal<EntityPyCondition> Lamp_4_Open_For_10_Seconds
+    condition:
+        "lamp_4_set.luminosity > 0"
+    timeConstraints:
+        - FOR_TIME(10)
+end
+
+Goal<Complex> Checkpoint_4
+    goals:
+        - Area_1_Reached
+        - Lamp_4_Open_For_10_Seconds
+    strategy: ALL_ACCOMPLISHED_ORDERED
+end
+
+Goal<EntityPyCondition> Area_2_Reached
+    condition:
+        "len(area_6_data.value) > 0 and area_6_data.value[0] == 'tesla'"
+end
+
+Goal<EntityPyCondition> Lamp_5_Open_For_10_Seconds
+    condition:
+        "lamp_5_set.luminosity > 0"
+    timeConstraints:
+        - FOR_TIME(10)
+end
+
+Goal<Complex> Checkpoint_5
+    goals:
+        - Area_2_Reached
+        - Lamp_5_Open_For_10_Seconds
+    strategy: ALL_ACCOMPLISHED_ORDERED
+end
+
+Scenario Week_2_Task_14
+    goals:
+        - Checkpoint_1
+        - Checkpoint_2
+        - Checkpoint_3
+        - Checkpoint_4
+        - Checkpoint_5
+    concurrent: False
+end
+
+
+Model 3:
+Metadata
+name: bSRWu
+version: "0.1.0"
+author: "AUTHOR_NAME_HERE"
+email: "CONTACT_EMAIL_HERE"
+description: "BRIEF_DESCRIPTION"
+end
+Broker<MQTT> LocsysMQTT
+host: 'locsys.issel.ee.auth.gr'
+port: 8883
+ssl: true
+auth:
+username: '*****'
+password: '*****'
+end
+Broker<MQTT> LocalMQTT
+host: 'localhost'
+port: 1883
+auth:
+username: ''
+password: ''
+end
+Broker<Redis> LocalRedis
+host: 'localhost'
+port: 6379
+auth:
+username: ''
+password: ''
+end
+RTMonitor
+broker: LocalRedis
+eventTopic: "goaldsl.{U_ID}.event"
+logsTopic: "goaldsl.{U_ID}.log"
+end
+Entity big_brother_camera_detection
+type: sensor
+uri: "streamsim.{UID}.world.world.sensor.visual.camera.big_brother_camera.detection"
+source: LocalRedis
+freq: 3.0
+attributes:
+- detection: dict
+end
+Entity child_pose
+type: sensor
+uri: "streamsim.{UID}.actor.human.child.pose"
+source: LocalRedis
+freq: -1
+attributes:
+- position: dict
+- orientation: dict
+end
+Entity child_properties
+type: sensor
+uri: "streamsim.{UID}.actor.human.child.properties"
+source: LocalRedis
+freq: -1
+attributes:
+- move: bool
+- sound: bool
+- lang: str
+- range: float
+- speech: str
+- emotion: str
+- gender: str
+- age: float
+end
+Entity woman_pose
+type: sensor
+uri: "streamsim.{UID}.actor.human.woman.pose"
+source: LocalRedis
+freq: -1
+attributes:
+- position: dict
+- orientation: dict
+end
+Entity woman_properties
+type: sensor
+uri: "streamsim.{UID}.actor.human.woman.properties"
+source: LocalRedis
+freq: -1
+attributes:
+- move: bool
+- sound: bool
+- lang: str
+- range: float
+- speech: str
+- emotion: str
+- gender: str
+- age: float
+end
+Entity AppVariables
+type: sensor
+uri: "appcreator.variables"
+source: LocalRedis
+freq: -1
+attributes:
+- name: str
+- value: str
+- type: str
+end
+// ------------------- GOALS --------------------------------------
+// ----------------------------------------------------------------
+// Goal<EntityStateChange> Angry_Human_Detected
+// entity: big_brother_camera_detection
+// end
+Goal<EntityPyCondition> Angry_Human_Detected
+condition:
+"len(big_brother_camera_detection.detection) > 0 and big_brother_camera_detection.detection['emotion']['value'] == 'angry'"
+end
+Goal<EntityPyCondition> Human_Angle_Correct
+condition:
+"AppVariables.name == 'human' and (AppVariables.value > 6 and AppVariables.value < 7)"
+end
+Scenario Week_2_Task_12
+goals:
+- Angry_Human_Detected
+- Human_Angle_Correct
+concurrent: False
+end
+DFlow grammar:
+// FQN: ID('.'ID)*;
+ADDRESS_ID: /([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}/;
+
+FQN: ID+['.'];
+FQNI: ID+['.']('.*')?;
+// Import: 'import' importURI=FQNI ('as' name=ID)?;
+NID: /(.*?)\n/;
+NIDREF: NID+['.']('.*')?;
+Import: 'import' name=STRING;
+
+// Comments
+Comment: CommentLine | CommentBlock ;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;
+
+Word: /[-\w ]*\b/;
+WordExt: /[-\.\@\w ]*\b/;
+
+// Types
+
+Time:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+Date: month=INT ':' day=INT ':' year=INT;
+
+// Hours: /[0-2]?[0-9]?/;
+// Minutes: /[0-5][0-9]/;
+
+/*
+List:
+    '[' items*=ListItem[','] ']'
+;
+
+ListItem:
+    NUMBER | STRING | BOOL | List | Dict | OBJECT
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    name=STRING ':' value=DictType
+;
+
+DictType:
+    NUMBER | STRING | BOOL | Dict | List | OBJECT
+;
+*/
+
+NLUConfig:
+    (
+        ('model_name:' name=STRING)
+        ('model_weights:' weights=STRING)
+    )#
+;
+
+Connector: Slack | Telegram;
+
+Slack:
+    'Connector' name='slack'
+    (
+        ('token:' token=STRING)
+        ('channel:' channel=STRING)
+        ('signing_secret:' signing_secret=STRING)
+    )#
+    'end'
+;
+
+Telegram:
+    'Connector' name='telegram'
+    (
+        ('token:' token=STRING)
+        ('verify:' verify=STRING)
+        ('webhook_url:' webhook_url=STRING)
+    )#
+    'end'
+;
+
+AccessControlDef:
+    (
+    roles=Roles
+    policies*=Policy
+    (path=Path)?
+    (users=Users)?
+    authentication=Authentication
+    )#
+;
+
+Roles:
+    'Roles'
+        words+=Word[',']
+        'default:'
+            default=Word
+    'end'
+;
+
+Policy:
+    'Policy' name=ID
+        'on:' actions+=Word[',']
+        'roles:' roles+=Word[',']
+    'end'
+;
+
+Path:
+    'Path'
+        path=STRING
+    'end'
+;
+
+Users:
+    'Users'
+        roles+=UserRoles
+    'end'
+;
+
+Authentication:
+    'Authentication'
+        'method:' method=AuthMethods
+        (
+        'slot_name:' slot_name=Word
+        )?
+    'end'
+;
+
+UserRoles: role=Word ':' users+=WordExt[','];
+
+AuthMethods: 'slot' | 'user_id' | 'slack' | 'telegram';
+
+
+dFlow:
+(
+    (metadata=Metadata)?
+
+    ('entities'
+        entities*=TrainableEntity
+    'end')?
+
+    ('synonyms'
+        synonyms*=Synonym
+    'end')?
+
+    ('gslots'
+        gslots*=GlobalSlot[',']
+    'end')?
+
+    ('triggers'
+        triggers+=Trigger
+    'end')?
+
+    ('dialogues'
+        dialogues+=Dialogue
+    'end')?
+
+    ('eservices'
+        eservices*=EServiceDef
+    'end')?
+
+    ('access_controls'
+        access_control=AccessControlDef
+    'end')?
+
+    ('connectors'
+        connectors*=Connector
+    'end')?
+
+    ('nluconfig'
+        nlu_config=NLUConfig
+    'end')?
+)#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('email:' email=STRING)?
+    )#
+    'end'
+;
+
+// ENTITIY --------------------------------------------------------------
+// ----------------------------------------------------------------------
+Entity: TrainableEntity | PretrainedEntity;
+
+TrainableEntity:
+    'Entity' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+PretrainedEntity:
+    'PERSON'        |
+    'NORP'          |
+    'FAC'           |
+    'ORG'           |
+    'GPE'           |
+    'LOC'           |
+    'PRODUCT'       |
+    'EVENT'         |
+    'WORK_OF_ART'   |
+    'LAW'           |
+    'LANGUAGE'      |
+    'DATE'          |
+    'TIME'          |
+    'PERCENT'       |
+    'MONEY'         |
+    'QUANTITY'      |
+    'ORDINAL'       |
+    'CARDINAL'
+;
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+Synonym:
+    'Synonym' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+// TRIGGER --------------------------------------------------------------
+// ----------------------------------------------------------------------
+Trigger: Intent | Event;
+
+Intent:
+    'Intent' name=ID
+        phrases+=IntentPhraseComplex[',']
+    'end'
+;
+
+Event:
+    'Event' name=ID
+        uri=STRING
+    'end'
+;
+
+IntentPhraseComplex: phrases+=IntentPhrase;
+
+IntentPhrase:
+    IntentPhraseStr |
+    IntentPhraseSynonym |
+    TrainableEntityRef |
+    PretrainedEntityRef
+;
+
+IntentPhraseStr: STRING;
+
+TrainableEntityRef: 'TE:' entity=[TrainableEntity|FQN|^entities*];
+
+PretrainedEntityRef: 'PE:' entity=[PretrainedEntity|FQN|^entities*] ('[' refPreValues*=STRING[','] ']')?;
+
+IntentPhraseSynonym: 'S:' synonym=[Synonym|FQN];
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+// DIALOGUE -------------------------------------------------------------
+// ----------------------------------------------------------------------
+Dialogue:
+    'Dialogue' name=ID
+        'on:' onTrigger+=[Trigger|FQN|^triggers][',']
+        'responses:' responses+=Response[',']
+    'end'
+;
+
+Response: ActionGroup | Form;
+
+Form:
+    'Form' name=ID
+        params+=FormParam
+    'end'
+;
+
+FormParam:
+    name=ID ':' type=ParameterTypeDef '=' source=FormParamSource
+;
+
+FormParamRef: param=[FormParam|FQN|^dialogues*.responses.params];
+FormParamIndex: FormParamRef('['ID('.'ID)*']')?;
+
+FormParamSource: HRIParamSource | EServiceParamSource;
+
+HRIParamSource:
+    'HRI' '(' askSlot+=Text (',' '['extract+=ExtractionSource[','] ']')? ')'
+;
+
+ExtractionSource: ExtractFromEntity | ExtractFromIntent;
+ExtractFromIntent: intent=[Trigger|FQN|^triggers*] ':' value=ParameterValue;
+/* ExtractFromEntity: entity=[Entity|FQN|^entities*]; */
+ExtractFromEntity: TrainableEntityRef | PretrainedEntityRef;
+
+// EService -------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+EServiceDef: EServiceDefHTTP;
+
+EServiceDefHTTP:
+    'EServiceHTTP' name=ID
+        (  'verb:' verb=HTTPVerb
+          'host:' host=STRING
+          ('port:' port=INT)?
+          ('path:' path=STRING)?
+          ('mime:' mime*=STRING[','])?
+        )#
+    'end'
+;
+
+EServiceParamSource: EServiceCallHTTP;
+
+EServiceCallHTTP:
+    eserviceRef=[EServiceDef|FQN|eservices]'('
+        (
+        ('query=' '[' query_params*=EServiceParam[','] ']' ',')?
+        ('header=' '[' header_params*=EServiceParam[','] ']' ',')?
+        ('path=' '[' path_params*=EServiceParam[','] ']' ',')?
+        ('body=' '[' body_params*=EServiceParam[','] ']' ',')?
+        )#
+    ')' ('[' response_filter=EServiceResponseFilter ']')? ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+EServiceParam: name=ID '=' value=ParameterValue;
+
+ParameterValue:
+    INT                 |
+    FLOAT               |
+    STRING              |
+    BOOL                |
+    List                |
+    Dict                |
+    EnvPropertyDef		|
+    FormParamIndex      |
+    GlobalSlotIndex     |
+	Text
+;
+
+ParameterTypeDef:
+    'int'   |
+    'float' |
+    'str'   |
+    'bool'  |
+    'list'  |
+    'dict'
+;
+
+EServiceResponseFilter: EServiceResponseElement('.'EServiceResponseElement)*;
+
+EServiceResponseElement: ID | INT;
+// ----------------------------------------------------------------------
+
+// Global Slots ---------------------------------------------------------
+// ----------------------------------------------------------------------
+GlobalSlotValue: ParameterValue;
+GlobalSlotType: ParameterTypeDef;
+GlobalSlotRef: slot=[GlobalSlot|FQN|^gslots];
+GlobalSlotIndex: FormParamRef('['ID('.'ID)*']')?;
+
+GlobalSlot:
+    name=ID ':' type=GlobalSlotType ('=' default=GlobalSlotValue)?
+;
+// ----------------------------------------------------------------------
+
+// ACTIONS --------------------------------------------------------------
+// ----------------------------------------------------------------------
+ActionGroup:
+    'ActionGroup' name=ID
+        actions+=Action
+    'end'
+;
+
+Action:
+    SpeakAction     |
+    FireEventAction |
+    RESTCallAction  |
+    SetFormSlot     |
+    SetGlobalSlot
+;
+
+SpeakAction:
+    'Speak' '(' text+=Text ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetFormSlot:
+    'SetFSlot' '(' slotRef=FormParamRef ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetGlobalSlot:
+    'SetGSlot' '(' slotRef=GlobalSlotRef ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+FireEventAction:
+    'FireEvent' '(' uri+=Text ',' msg=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+RESTCallAction: EServiceCallHTTP;
+// ----------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------
+
+// GENERAL --------------------------------------------------------------
+// ----------------------------------------------------------------------
+HTTPVerb:
+    'GET'   |
+    'POST'  |
+    'PUT'
+;
+
+EnvPropertyDef: UserPropertyDef | SystemPropertyDef;
+UserPropertyDef: 'USER:' property=[UserProperty|FQN];
+SystemPropertyDef: 'SYSTEM:' property=[SystemProperty|FQN];
+
+UserProperty:
+    'NAME'      |
+    'SURNAME'   |
+    'AGE'       |
+    'EMAIL'     |
+    'PHONE'		|
+    'CITY'		|
+    'ADDRESS'
+;
+
+SystemProperty:
+	'TIME'			|
+	'LOCATION'		|
+	'RANDOM_INT'	|
+	'RANDOM_FLOAT'  |
+    'HOSTNAME'      |
+    'PUBLIC_IP'     |
+    'USER_EXPRESSION'
+;
+
+// TYPES
+
+DictItem:
+    name=ID ':' value=DictType
+;
+
+DictType:
+    NUMBER | STRING | BOOL | Dict | List | FormParamIndex | GlobalSlotIndex
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+List:
+    '[' items*=ListElement[','] ']'
+;
+
+ListElement:
+    NUMBER | STRING | BOOL | List | Dict | FormParamIndex | GlobalSlotIndex
+;
+
+
+Text: STRING | EnvPropertyDef | FormParamIndex | GlobalSlotIndex;
+
+
+Model 1:
+entities
+    Entity Doctor
+        doctor,
+        Kardiologos,
+        Odontiatros,
+        good doc
+    end
+end
+
+synonyms
+    Synonym date_period
+        mera,
+        evdomada,
+        mina,
+        aurio,
+        some day
+    end
+end
+
+triggers
+    Intent find_doctor
+        "I want" TE:Doctor "please",
+        TE:Doctor "please!",
+        "I want to call" TE:Doctor,
+        "I want to call" TE:Doctor S:date_period,
+        "I want to call" TE:Doctor "test" S:date_period "test",
+        "I want to call" PE:PERSON "test",
+        "I want to call" TE:Doctor "test" S:date_period "test" PE:PERSON["Test","Test"]
+        "I want to call" PE:PERSON["Test","Test"] "test"
+    end
+
+    Event external_1
+        "bot/event/external_1"
+    end
+end
+
+eservices
+    EServiceHTTP weather_svc
+        verb: GET
+        host: 'r4a.issel.ee.auth.gr'
+        port: 8080
+        path: '/weather'
+    end
+    EServiceHTTP storage_svc
+        verb: POST
+        host: 'r4a.issel.ee.auth.gr'
+        port: 00
+        path: '/{username}'
+    end
+end
+
+dialogues
+    Dialogue DialA
+        on: find_doctor
+        responses:
+            Form AF1
+                slot1: str = HRI('Give parameter 1', [PE:PERSON])
+                slot2: str = HRI('Give parameter 2',
+                    [find_doctor:True, external_1:False])
+                slot3: str = HRI('Give parameter 3 you' AF1.slot1, [TE:Doctor])
+            end,
+            ActionGroup answers
+              Speak('Hello' AF1.slot1 'how are you')
+            end
+    end
+    Dialogue DialB
+        on: external_1
+        responses:
+            Form SF1
+                slot1: str = HRI('Give parameter 1')
+                slot2: str = storage_svc(query=[city={a:SF1.slot1, b:0}],path=[username='mario'],)
+            end,
+            ActionGroup answers2
+              Speak('The weather is ' SF1.slot1)
+              storage_svc(query=[city=SF1.slot1], path=[username='mario'],)
+            end
+    end
+end
+
+Model 2:
+triggers
+  Intent start_workout
+    "I want to start a workout",
+    "Let's do a workout",
+    "Time for my workout", 
+    "I'm ready to exercise",
+    "Suggest a workout for me"
+  end
+
+  Intent log_exercise
+    "I did" PE:CARDINAL "sets of" PE:CARDINAL["1","2"] TE:exercise,
+    "I completed" PE:CARDINAL "reps of" TE:exercise,
+    "Log" PE:CARDINAL "minutes of" TE:exercise,
+    "Add" TE:exercise "to my workout"
+  end
+
+  Intent view_summary
+    "Show me my workout summary",
+    "What exercises have I done today?",
+    "Can you summarize my workout?",
+    "I want to see my fitness progress",
+    "Give me an update on my workouts"
+  end
+end
+
+entities
+  Entity exercise
+    pushups,
+    situps,
+    squats,
+    lunges,
+    bicep curls,
+    tricep dips,
+    crunches,
+    jumping jacks,
+    burpees,
+    mountain climbers
+  end
+end
+
+eservices
+  EServiceHTTP suggest_workout
+    verb: GET
+    host: 'https://fitness.example.com'
+    path: '/workouts/suggest'
+  end
+
+  EServiceHTTP log_workout 
+    verb: POST
+    host: 'https://fitness.example.com'
+    path: '/workouts/log'
+  end
+
+  EServiceHTTP get_summary
+    verb: GET
+    host: 'https://fitness.example.com'
+    path: '/workouts/summary'
+  end
+end
+
+dialogues
+  Dialogue workout_suggestion
+    on: start_workout
+    responses:
+      Form suggest_form
+        workout: str = suggest_workout()[workout]
+      end,
+      ActionGroup suggest_actions  
+        Speak('Here is a suggested workout for today: ' suggest_form.workout)
+      end
+  end
+
+  Dialogue log_workout_dlg
+    on: log_exercise
+    responses:
+      Form log_form
+        exercise: str = HRI('What exercise did you do?', [TE:exercise])
+        reps: int = HRI('How many reps or sets?')
+      end,
+      ActionGroup log_actions
+        log_workout(body=[exercise=log_form.exercise, reps=log_form.reps],)
+        Speak('Got it, I logged your ' log_form.exercise ' workout.') 
+      end
+  end
+   
+  Dialogue summary_dlg
+    on: view_summary
+    responses:
+      Form summary_form
+        summary: str = get_summary()[summary]
+      end,
+      ActionGroup show_summary
+        Speak('Here is your workout summary: ' summary_form.summary)
+      end
+  end
+end
+
+Model 3:
+triggers
+  Intent ask_weather
+    "I want to tell me the weather",
+    "Tell me the weather please",
+    "I want to tell me the weather for" PE:GPE['Trikala', 'Athens'],
+    "Tell me the weather please for" PE:DATE['tomorrow', 'today'],
+    "Tell me the weather" PE:DATE['tomorrow', 'today'] "for"  PE:GPE['Trikala', 'Athens']
+  end
+
+  Intent greet
+    "hey",
+    "hello",
+    "hi",
+    "hello there",
+    "good morning",
+    "good evening",
+    "moin",
+    "hey there",
+    "let's go",
+    "hey dude",
+    "goodmorning",
+    "goodevening",
+    "good afternoon"
+  end
+
+  Intent bot_challenge
+    "are you a bot?",
+    "are you a human?",
+    "am I talking to a bot?",
+    "am I talking to a human?"
+  end
+end
+
+eservices
+    EServiceHTTP weather_svc
+        verb: GET
+        host: 'http://services.issel.ee.auth.gr'
+        path: '/general_information/weather_openweather'
+    end
+end
+
+dialogues
+  Dialogue weather_dialogue
+      on: ask_weather
+      responses:
+        Form form1
+          city_slot: str = HRI('For which city?', [PE:GPE])
+          answer: str = weather_svc(query=[city=form1.city_slot, language="English"], header=[access_token="Q5eJZ8sSLEX6XNmOHyMlWagI"],)[description]
+        end,
+        ActionGroup answer_back
+          Speak('The kairos gia tin ' form1.city_slot ' is ' form1.answer)
+        end
+  end
+
+  Dialogue greet_dialogue
+      on: greet
+      responses:
+        ActionGroup greet_back
+          Speak('Hello ma man!!!')
+        end
+  end
+
+  Dialogue bot_challenge_dialogue
+      on: bot_challenge
+      responses:
+        ActionGroup respond_iambot
+          Speak('I am a boot, powered by dFlow and Rasa.')
+        end
+  end
+
+
+end
+
+
+After studying and understanding how valid models are created from their corresponding grammar, based on the current textX grammar I want you to generate a model that meets the following requirements:
+
+CRITICAL: THE MODEL SHOULD MEET THE FOLLOWING REQUIREMENTS AND BE SYNTACTICALLY VALID
+
+Requirements
+R1: Create a model with exactly 1 MQTT broker configuration:
+
+Include: host, port, ssl, keepalive fields
+Use simple authentication (username/password)
+Broker name: "homeBroker"
+
+R2: Define exactly 4 entities:
+
+Temperature sensor with:
+
+Entity type: "sensor"
+Topic: "home/temperature"
+Frequency: 30.0
+4 attributes: temperature (float), humidity (int), pressure (float), timestamp (string)
+Use 2 different value generator types: constant for temperature/humidity, range-based (min/max) for pressure, timestamp generator for timestamp
+
+
+Motion sensor with:
+
+Entity type: "sensor"
+Topic: "home/motion"
+Frequency: 10.0
+2 attributes: detected (boolean), zone (string)
+Use constant value generators
+
+
+Light actuator with:
+
+Entity type: "actuator"
+Topic: "home/lights"
+3 attributes with default values: brightness (int), color (string), state (boolean)
+
+
+Fan actuator with:
+
+Entity type: "actuator"
+Topic: "home/fan"
+2 attributes with default values: speed (int), mode (string)
+
+
+
+R3: Create exactly 2 automations with enhanced conditions:
+
+First automation (name: "tempControl"):
+
+Compound condition using AND: temperature > 25.0 AND humidity > 60
+3 actions: set light brightness to 100, set light state to true, set fan speed to 3
+Fields: enabled=true, continuous=true, priority=1
+
+
+Second automation (name: "motionResponse"):
+
+Condition referencing entity attribute: detected == true
+2 actions: set light brightness to 80, set light color to "warm"
+Fields: enabled=true, continuous=false, priority=2
+
+
+
+R4: Include extended metadata:
+
+Name, version (must use semantic versioning format like "1.0.0"), description, and author
+No imports, no RTMonitor 
+
+CRITICAL: Return ONLY the raw model content for a .txt file:
+- NO markdown formatting (no ```, no code blocks, no backticks)
+- NO explanations, descriptions, or additional text
+- NO "Here is the model:" or similar introductions
+- ONLY the actual model content that can be directly saved to a .txt file and be validated against a textX grammar
+- The response should start immediately with the model content
+
+

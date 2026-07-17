@@ -1,0 +1,11 @@
+
+
+#####SmAuto example requirements
+R1 - The grammar should support metadata declarations with system information.
+R2 - The grammar should support broker configuration and management.
+R3 - The grammar should support authentication mechanisms.
+R4 - The grammar should support entity definitions with properties and behaviors.
+R5 - The grammar should support automation declarations with execution control.
+R6 - The grammar should support condition specifications for logical evaluation.
+R7 - The grammar should support action definitions for system operations.
+R8 - The grammar should support a unified model structure that combines these components.

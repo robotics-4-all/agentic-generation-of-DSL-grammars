@@ -1,0 +1,240 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfiguration
+        authentication*=AuthenticationMechanism
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+        conditions*=ConditionSpecification
+        actions*=ActionDefinition
+    )#
+;
+
+TokenType:
+    'bearer' | 'api_key' | 'jwt'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'system' | 'virtual'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'on_demand' | 'continuous'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notification' | 'script' | 'webhook'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfiguration:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+AuthenticationMechanism:
+    UsernamePasswordAuth | TokenAuth | CertificateAuth
+;
+
+UsernamePasswordAuth:
+    'Auth<UserPass>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=TokenType)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfiguration])
+        ('topic:' topic=STRING)?
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+    )#
+    'end'
+;
+
+PropertyDefinition:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorDefinition:
+    name=ID ':' behaviorType=BehaviorType
+;
+
+TriggerDefinition:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityTrigger:
+    'entity:' entity=[EntityDefinition] 'property:' property=ID 'operator:' operator=ComparisonOperator 'value:' value=PropertyValue
+;
+
+TimeTrigger:
+    'time:' timeExpression=TimeExpression
+;
+
+EventTrigger:
+    'event:' eventName=STRING
+;
+
+TimeExpression:
+    CronExpression | IntervalExpression
+;
+
+CronExpression:
+    'cron:' expression=STRING
+;
+
+IntervalExpression:
+    'interval:' value=INT 'unit:' unit=TimeUnit
+;
+
+ScheduleDefinition:
+    'start:' startTime=STRING 'end:' endTime=STRING
+;
+
+SimpleCondition:
+    entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionTerm:
+    SimpleCondition | '(' expression=LogicalExpression ')'
+;
+
+LogicalExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActionParameter:
+    name=ID ':' value=ParameterValue
+;
+
+ParameterValue:
+    STRING | FLOAT | INT | BOOL | entity=[EntityDefinition] '.' property=ID
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[EntityDefinition])?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retries:' retries=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=TriggerDefinition)
+        ('condition:' condition=[ConditionSpecification])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('priority:' priority=INT)?
+        ('schedule:' schedule=ScheduleDefinition)?
+    )#
+    'end'
+;

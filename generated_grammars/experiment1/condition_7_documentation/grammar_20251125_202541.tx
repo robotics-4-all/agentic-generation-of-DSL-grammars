@@ -1,0 +1,283 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+        ('system_info:' system_info=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('client_id:' client_id=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'broker' 'redis' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+SensorType:
+    'temperature' | 'humidity' | 'motion' | 'light' | 'pressure' | 'gas' | 'sound' | 'camera' | 'gps'
+;
+
+ActuatorType:
+    'switch' | 'dimmer' | 'motor' | 'valve' | 'heater' | 'cooler' | 'speaker' | 'display'
+;
+
+DeviceType:
+    'thermostat' | 'doorlock' | 'alarm' | 'tv' | 'router' | 'gateway' | 'hub'
+;
+
+Property:
+    name=ID ':' value=PropertyValue
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Entity:
+    Sensor | Actuator | Device
+;
+
+Sensor:
+    'sensor' name=ID
+    (
+        ('type:' sensor_type=SensorType)
+        ('topic:' topic=STRING)
+        ('broker:' broker=[BrokerConfig])?
+        ('properties:' properties*=Property)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Actuator:
+    'actuator' name=ID
+    (
+        ('type:' actuator_type=ActuatorType)
+        ('topic:' topic=STRING)
+        ('broker:' broker=[BrokerConfig])?
+        ('properties:' properties*=Property)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Device:
+    'device' name=ID
+    (
+        ('type:' device_type=DeviceType)
+        ('topic:' topic=STRING)
+        ('broker:' broker=[BrokerConfig])?
+        ('properties:' properties*=Property)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+Time:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | FixedTimeSchedule
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'every' interval=INT unit=TimeUnit
+;
+
+FixedTimeSchedule:
+    'at' time=Time ('on' days*=DayOfWeek)?
+;
+
+Trigger:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+StateTrigger:
+    'state' entity=[Entity] '.' property=ID 'to' target_state=STRING
+;
+
+EventTrigger:
+    'event' event_type=STRING ('from' source=[Entity])?
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+EntityReference:
+    entity=[Entity] ('.' property=ID)?
+;
+
+ConditionValue:
+    FLOAT | INT | STRING | BOOL | EntityReference
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=ConditionValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+ActionValue:
+    FLOAT | INT | STRING | BOOL | EntityReference
+;
+
+ParamPair:
+    name=ID ':' value=ActionValue
+;
+
+ActionParams:
+    '{' params*=ParamPair[','] '}'
+;
+
+Action:
+    SetAction | CallAction | NotifyAction | DelayAction
+;
+
+SetAction:
+    'set' target=[Entity] 'to' value=ActionValue
+;
+
+CallAction:
+    'call' service=STRING ('with' params=ActionParams)?
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' recipients*=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions*=Condition)?
+        ('actions:' actions*=Action)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

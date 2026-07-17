@@ -1,0 +1,22 @@
+R1 - The grammar should support metadata declarations with system information including name, description, author, and Codin API token for deployment purposes.
+R2 - The grammar should support broker definitions for MQTT protocol with host, port, ssl, webPath, and webPort configuration for MQTT over Websockets communication.
+R3 - The grammar should support broker definitions for AMQP protocol with host, port, ssl, and optional vhost, topicExchange, and rpcExchange parameters.
+R4 - The grammar should support broker definitions for Redis protocol with host, port, ssl, and optional db (database number) parameter.
+R5 - The grammar should support unified authentication for all broker types with username and password credentials.
+R6 - The grammar should support entity definitions representing connected smart devices with a unique name, entity type (sensor, actuator, hybrid), topic for message routing using dot notation, broker reference, and optional description.
+R7 - The grammar should support entity attribute definitions with data types including int, float, bool, str, time, list, and dict (with support for nested dictionaries).
+R8 - The grammar should support optional frequency (freq) property for sensor-type entities to set message publishing rate.
+R9 - The grammar should support Gauge visual component with label, entity and attribute references, minValue, maxValue, leftColor, rightColor, levels, hideTxt, unit, and position properties.
+R10 - The grammar should support LogsDisplay visual component with label, entity and attribute references, and position properties.
+R11 - The grammar should support ValueDisplay visual component with label, entity and attribute references, unit, and position properties.
+R12 - The grammar should support AliveDisplay visual component with label, entity reference, timeout (in milliseconds), and position properties.
+R13 - The grammar should support JsonViewer visual component with label, entity reference, and position properties.
+R14 - The grammar should support Plot definitions with label, ptype (Line or Bar), entity and attribute references, color, and smooth properties.
+R15 - The grammar should support PlotView container component with label, list of plot references, position, xAxis, yAxis, horizontalGrid, verticalGrid, legend, legendPosition (topRight, topLeft, bottomRight, bottomLeft), and maxValues properties.
+R16 - The grammar should support Button component with label, entity reference, and payload properties that specify attribute-value pairs to send when clicked.
+R17 - The grammar should support ButtonGroup component with label, alignTxt, alignBtns, list of button references, and position properties.
+R18 - The grammar should support Placement specification for visual components with x, y coordinates, width, and height values, where the dashboard canvas has a width of 24 units.
+R19 - The grammar should support Color specification as enumerated values: Red, red, Blue, blue, Yellow, yellow, Green, green, Cyan, cyan.
+R20 - The grammar should support AlignType specification with values: Center, Left, Right, Top, Bottom, Horizontal, Vertical.
+R21 - The grammar should support a model structure where Metadata must be defined first, followed by Broker definitions, then Entity definitions, and finally Visual Components.
+R22 - The grammar should support cross-references allowing visual components to reference entity names and attributes, and entities to reference broker definitions.

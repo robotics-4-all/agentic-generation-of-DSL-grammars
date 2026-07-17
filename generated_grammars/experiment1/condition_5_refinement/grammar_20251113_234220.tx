@@ -1,0 +1,391 @@
+SmartEnvironmentModel:
+    (
+        imports*=Import
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+        expressions*=Expression
+        actions*=ActionDef
+    )#
+;
+
+Import:
+    'import' uri=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'MQTTBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'AMQPBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'HTTPBroker' name=ID
+    (
+        ('baseurl:' baseurl=STRING)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('headers:' '{' headers*=HeaderPair[','] '}')?
+    )#
+    'end'
+;
+
+HeaderPair:
+    key=STRING ':' value=STRING
+;
+
+BasicAuth:
+    'BasicAuth' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+        ('realm:' realm=STRING)?
+    )#
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)
+        ('header:' header=STRING)?
+        ('expiry:' expiry=STRING)?
+    )#
+    'end'
+;
+
+TokenType:
+    'Bearer' | 'Basic' | 'Custom'
+;
+
+CertificateAuth:
+    'CertificateAuth' name=ID
+    (
+        ('certpath:' certpath=STRING)
+        ('keypath:' keypath=STRING)
+        ('capath:' capath=STRING)?
+        ('passphrase:' passphrase=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'APIKeyAuth' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=KeyLocation)
+        ('name:' keyname=STRING)?
+    )#
+    'end'
+;
+
+KeyLocation:
+    'header' | 'query' | 'cookie'
+;
+
+SensorEntity:
+    'Sensor' name=ID
+    (
+        ('type:' type=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('sampling_rate:' sampling_rate=FLOAT)?
+        ('unit:' unit=STRING)?
+        ('range:' range=RangeDef)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Actuator' name=ID
+    (
+        ('type:' type=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('commands:' '-' commands*=CommandDef['-'])?
+        ('states:' '-' states*=StateDef['-'])?
+    )#
+    'end'
+;
+
+DeviceEntity:
+    'Device' name=ID
+    (
+        ('type:' type=STRING)
+        ('location:' location=STRING)?
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+        ('status:' status=STRING)?
+    )#
+    'end'
+;
+
+ServiceEntity:
+    'Service' name=ID
+    (
+        ('type:' type=STRING)
+        ('endpoint:' endpoint=STRING)
+        ('auth:' auth=ID)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('operations:' '-' operations*=OperationDef['-'])?
+        ('protocol:' protocol=ProtocolType)?
+    )#
+    'end'
+;
+
+ProtocolType:
+    'HTTP' | 'HTTPS' | 'WebSocket' | 'gRPC' | 'REST'
+;
+
+PropertyDef:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'datetime' | 'json' | 'array' | 'object'
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters*=ParameterDef[','] ')')?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'conditional' | 'manual' | 'automatic'
+;
+
+ParameterDef:
+    name=ID ':' datatype=DataType
+;
+
+CommandDef:
+    name=ID ':' command_type=STRING ('(' parameters*=ParameterDef[','] ')')?
+;
+
+StateDef:
+    name=ID ':' value=PropertyValue
+;
+
+CapabilityDef:
+    name=ID ':' capability_type=STRING
+;
+
+OperationDef:
+    name=ID ':' method=HTTPMethod path=STRING ('(' parameters*=ParameterDef[','] ')')?
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+RangeDef:
+    min=FLOAT '-' max=FLOAT
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=STRING)
+        ('repeat:' repeat=BOOL)?
+        ('timezone:' timezone=STRING)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('entity:' entity=ID)
+        ('event:' event=STRING)
+        ('filter:' filter=FilterExpression)?
+    )#
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=ID)
+        ('property:' property=ID)
+        ('condition:' condition=ComparisonCondition)
+    )#
+;
+
+SimpleCondition:
+    entity=ID '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+CompoundCondition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+ComparisonCondition:
+    operator=ComparisonOperator value=PropertyValue
+;
+
+FilterExpression:
+    property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains'
+;
+
+LogicalOperator:
+    'AND' | 'OR' | 'NOT'
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('target:' target=ID)
+        ('command:' command=STRING)
+        ('parameters:' '{' params*=ActionParameter[','] '}')?
+        ('delay:' delay=FLOAT)?
+    )#
+;
+
+ServiceAction:
+    'ServiceAction'
+    (
+        ('service:' service=ID)
+        ('operation:' operation=STRING)
+        ('parameters:' '{' params*=ActionParameter[','] '}')?
+        ('timeout:' timeout=FLOAT)?
+    )#
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)
+        ('priority:' priority=NotificationPriority)?
+    )#
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+ScriptAction:
+    'ScriptAction'
+    (
+        ('script:' script=STRING)
+        ('language:' language=ScriptLanguage)
+        ('parameters:' '{' params*=ActionParameter[','] '}')?
+    )#
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash' | 'lua'
+;
+
+ActionParameter:
+    name=STRING ':' value=PropertyValue
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ArrayValue | ObjectValue
+;
+
+Expression:
+    entity=ID '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+EntityDef:
+    SensorEntity | ActuatorEntity | DeviceEntity | ServiceEntity
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ConditionDef:
+    CompoundCondition | SimpleCondition
+;
+
+ActionDef:
+    EntityAction | ServiceAction | NotificationAction | ScriptAction
+;

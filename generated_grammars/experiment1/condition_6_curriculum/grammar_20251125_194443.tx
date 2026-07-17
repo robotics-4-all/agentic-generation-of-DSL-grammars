@@ -1,0 +1,275 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication=Authentication?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('clientId:' clientId=STRING)?
+        ('keepAlive:' keepAlive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+AuthMethod:
+    'basic' | 'token' | 'oauth' | 'certificate'
+;
+
+BasicCredentials:
+    'Basic' '(' username=STRING ',' password=STRING ')'
+;
+
+TokenCredentials:
+    'Token' '(' token=STRING ')'
+;
+
+OAuthCredentials:
+    'OAuth' '(' clientId=STRING ',' clientSecret=STRING ',' tokenUrl=STRING ')'
+;
+
+CertCredentials:
+    'Certificate' '(' certPath=STRING ',' keyPath=STRING ')'
+;
+
+Credentials:
+    BasicCredentials | TokenCredentials | OAuthCredentials | CertCredentials
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ObjectValue | ArrayValue
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorTrigger:
+    'onPropertyChange' | 'onMessage' | 'onTimer' | 'onEvent'
+;
+
+BehaviorAction:
+    'updateProperty' | 'sendMessage' | 'executeCommand' | 'triggerAutomation'
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('action:' action=BehaviorAction)
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+RepeatConfig:
+    'RepeatConfig'
+    (
+        ('times:' times=INT)
+        ('interval:' interval=INT)?
+        ('until:' until=Condition)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('priority:' priority=INT)?
+        ('delay:' delay=INT)?
+        ('repeat:' repeat=RepeatConfig)?
+    )#
+    'end'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=TimeValue
+;
+
+ValueCondition:
+    value1=PropertyValue operator=ComparisonOperator value2=PropertyValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+Condition:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+EntityOperation:
+    'setValue' | 'sendCommand' | 'updateProperty' | 'toggle'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+ActionParameters:
+    '{' params*=ActionParameter[','] '}'
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('entity:' entity=[Entity])
+        ('operation:' operation=EntityOperation)
+        ('parameters:' parameters=ActionParameters)?
+    )#
+    'end'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)?
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'DelayAction' '(' duration=INT ')'
+;
+
+ConditionalAction:
+    'ConditionalAction'
+    (
+        ('condition:' condition=Condition)
+        ('thenAction:' thenAction=Action)
+        ('elseAction:' elseAction=Action)?
+    )#
+    'end'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ConditionalAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' '-' conditions*=Condition['-'])
+        ('actions:' '-' actions*=Action['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+Comment: CommentLine | CommentBlock;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;

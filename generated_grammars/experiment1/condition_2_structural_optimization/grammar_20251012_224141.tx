@@ -1,0 +1,231 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth_mechanisms*=AuthMechanism
+        entities*=Entity
+        conditions*=Condition
+        actions*=Action
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPHeader:
+    key=STRING ':' value=STRING
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthMechanism:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('vhost:' vhost=STRING)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers*=HTTPHeader)*
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'system' | 'virtual'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+BehaviorType:
+    'reactive' | 'proactive' | 'scheduled' | 'event_driven'
+;
+
+Behavior:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' properties*=Property)*
+        ('behaviors:' behaviors*=Behavior)*
+        ('broker:' broker=[BrokerConfig])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonExpression:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+Condition:
+    'condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notify' | 'log' | 'script' | 'service_call'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+Action:
+    'action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[Entity])?
+        ('parameters:' parameters*=ActionParameter)*
+        ('retry:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+EventTrigger:
+    'event' event_name=STRING ('from' entity=[Entity])?
+;
+
+TimeTrigger:
+    'time' time_expression=STRING
+;
+
+StateTrigger:
+    'state' entity=[Entity] 'property' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+ConditionRef:
+    condition=[Condition]
+;
+
+ActionRef:
+    action=[Action]
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions*=ConditionRef)*
+        ('actions:' actions*=ActionRef)*
+        ('execution:' execution=ExecutionControl)?
+        ('priority:' priority=INT)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

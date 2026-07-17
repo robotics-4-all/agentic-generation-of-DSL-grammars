@@ -1,0 +1,284 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('queue:' queue=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=HeaderList)?
+        ('timeout:' timeout=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderList:
+    '[' headers*=Header[','] ']'
+;
+
+Header:
+    key=STRING ':' value=STRING
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+        ('realm:' realm=STRING)?
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=ID)
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('location:' location=LocationDef)?
+        ('status:' status=StatusDef)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'hub'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=ValueExpr)?
+;
+
+DataType:
+    'int' | 'float' | 'str' | 'bool' | 'array' | 'object'
+;
+
+ValueExpr:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' values*=ValueExpr[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=KeyValuePair[','] '}'
+;
+
+KeyValuePair:
+    key=STRING ':' value=ValueExpr
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' params*=ParamDef[','] ')')?
+;
+
+BehaviorType:
+    'read' | 'write' | 'control' | 'monitor' | 'alert' | 'schedule'
+;
+
+ParamDef:
+    name=ID ':' param_type=DataType
+;
+
+LocationDef:
+    'room:' room=STRING ('zone:' zone=STRING)?
+;
+
+StatusDef:
+    'state:' state=STRING ('health:' health=HealthStatus)?
+;
+
+HealthStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions*=ConditionDef)?
+        ('actions:' actions*=ActionDef)+
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'event' entity=ID event_type=STRING
+;
+
+StateTrigger:
+    'state' entity=ID '.' property=ID operator=ComparisonOp value=ValueExpr
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' duration=INT unit=TimeUnit
+;
+
+OnceSchedule:
+    'once' datetime=STRING
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ConditionDef:
+    condition=ConditionExpr
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOp right=ConditionTerm)*
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpr ')' | SimpleCondition
+;
+
+SimpleCondition:
+    entity=ID '.' property=ID comparison_op=ComparisonOp value=ValueExpr
+;
+
+LogicalOp:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not_in'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction
+;
+
+EntityAction:
+    'set' entity=ID '.' property=ID value=ValueExpr
+;
+
+NotificationAction:
+    'notify' message=STRING ('channel:' channel=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ExecutionControl:
+    'mode:' mode=ExecutionMode ('retry:' retry=RetryConfig)? ('timeout:' timeout=INT)?
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;
+
+RetryConfig:
+    attempts=INT ('delay:' delay=INT unit=TimeUnit)?
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

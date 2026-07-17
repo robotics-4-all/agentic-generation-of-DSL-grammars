@@ -1,0 +1,236 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication=AuthConfig?
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    HTTPBroker | AMQPBroker | MQTTBroker
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=Dict)?
+        ('timeout:' timeout=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+AuthConfig:
+    'authentication'
+    (
+        ('type:' auth_type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('key:' key=STRING)?
+        ('cert:' cert=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'bearer' | 'apikey' | 'oauth2' | 'certificate'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' properties=Dict)?
+        ('state:' initial_state=EntityState)?
+        ('capabilities:' capabilities*=STRING[','])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'generic'
+;
+
+EntityState:
+    StateValue | Dict
+;
+
+StateValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('condition:' condition=ConditionDef)?
+        ('action:' action=ActionDef)
+        ('enabled:' enabled=BOOL)?
+        ('mode:' mode=AutomationMode)?
+    )#
+    'end'
+;
+
+AutomationMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+TriggerDef:
+    StateTrigger | TimeTrigger | EventTrigger
+;
+
+StateTrigger:
+    'state' entity=[EntityDef] 'from' from_state=EntityState? 'to' to_state=EntityState ('for' duration=TimeDuration)?
+;
+
+TimeTrigger:
+    'time' ('at' at_time=TimeValue | 'every' interval=TimeDuration)
+;
+
+EventTrigger:
+    'event' event_type=STRING ('data' event_data=Dict)?
+;
+
+TimeValue:
+    time=STRING
+;
+
+TimeDuration:
+    value=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ConditionDef:
+    condition_expr=ConditionExpr
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpr ')' | condition=PrimitiveCondition
+;
+
+PrimitiveCondition:
+    StateCondition | TimeCondition | NumericCondition
+;
+
+StateCondition:
+    entity=[EntityDef] operator=ComparisonOperator value=EntityState
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+NumericCondition:
+    entity=[EntityDef] operator=NumericOperator value=NUMBER
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | 'is' | 'is_not'
+;
+
+NumericOperator:
+    '>' | '<' | '>=' | '<=' | '==' | '!='
+;
+
+ActionDef:
+    actions*=ActionItem[',']
+;
+
+ActionItem:
+    SetStateAction | CallServiceAction | DelayAction | NotifyAction
+;
+
+SetStateAction:
+    'set' entity=[EntityDef] 'to' state=EntityState
+;
+
+CallServiceAction:
+    'call' service=STRING ('with' params=Dict)?
+;
+
+DelayAction:
+    'delay' duration=TimeDuration
+;
+
+NotifyAction:
+    'notify' message=STRING ('title' title=STRING)?
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    key=STRING ':' value=DictValue
+;
+
+DictValue:
+    STRING | FLOAT | INT | BOOL | Dict | List
+;
+
+List:
+    '[' items*=ListItem[','] ']'
+;
+
+ListItem:
+    STRING | FLOAT | INT | BOOL | Dict | List
+;

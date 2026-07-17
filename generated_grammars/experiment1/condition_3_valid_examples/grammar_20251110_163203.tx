@@ -1,0 +1,320 @@
+SmartEnvironmentModel:
+    imports*=ImportStatement
+    (metadata=Metadata)?
+    (
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+        conditions*=ConditionSpecification
+        actions*=ActionDefinition
+    )#
+;
+
+ImportStatement:
+    'import' path=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('broker:' broker=[BrokerConfig])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid' | 'virtual' | 'gateway'
+;
+
+PropertyDefinition:
+    name=ID ':' dataType=DataType ('=' defaultValue=ValueExpression)?
+;
+
+DataType:
+    'string' | 'float' | 'int' | 'bool' | 'json' | 'timestamp'
+;
+
+BehaviorDefinition:
+    name=ID ':' behavior=BehaviorType
+;
+
+BehaviorType:
+    'publish' | 'subscribe' | 'request' | 'response' | 'stream'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDefinition)
+        ('condition:' condition=[ConditionSpecification])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+TriggerDefinition:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'event' ':' entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=ValueExpression
+;
+
+TimeTrigger:
+    'time' ':' schedule=TimeSchedule
+;
+
+StateTrigger:
+    'state' ':' condition=[ConditionSpecification]
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' pattern=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' duration=INT unit=TimeUnit ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('parallel:' parallel=BOOL)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'queued' | 'scheduled' | 'conditional'
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+    | '(' expression=LogicalExpression ')'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'startswith' | 'endswith'
+;
+
+ValueExpression:
+    EntityReference | LiteralValue | FunctionCall
+;
+
+EntityReference:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL | NULL
+;
+
+FunctionCall:
+    name=ID '(' args*=ValueExpression[','] ')'
+;
+
+ActionDefinition:
+    PublishAction | CallAction | SetAction | DelayAction | ScriptAction
+;
+
+PublishAction:
+    'Action<Publish>' name=ID
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('property:' property=ID)
+        ('value:' value=ValueExpression)
+        ('retain:' retain=BOOL)?
+    )#
+    'end'
+;
+
+CallAction:
+    'Action<Call>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('payload:' payload=ValueExpression)?
+        ('headers:' headers=HeaderList)?
+    )#
+    'end'
+;
+
+SetAction:
+    'Action<Set>' name=ID
+    (
+        ('entity:' entity=[EntityDefinition])
+        ('property:' property=ID)
+        ('value:' value=ValueExpression)
+    )#
+    'end'
+;
+
+DelayAction:
+    'Action<Delay>' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+ScriptAction:
+    'Action<Script>' name=ID
+    (
+        ('language:' language=ScriptLanguage)
+        ('code:' code=STRING)
+        ('params:' params=ParameterList)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'lua' | 'shell'
+;
+
+HeaderList:
+    '[' headers*=HeaderItem[','] ']'
+;
+
+HeaderItem:
+    name=STRING ':' value=STRING
+;
+
+ParameterList:
+    '[' params*=ParameterItem[','] ']'
+;
+
+ParameterItem:
+    name=ID ':' value=ValueExpression
+;
+
+NULL:
+    'null'
+;

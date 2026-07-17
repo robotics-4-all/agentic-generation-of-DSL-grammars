@@ -1,0 +1,257 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth*=Authentication
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+PropertyType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+JsonObject:
+    '{' items*=JsonObjectItem[','] '}'
+;
+
+JsonObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+JsonArray:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    JsonObject | JsonArray | STRING | FLOAT | INT | BOOL
+;
+
+PropertyDef:
+    name=ID ':' prop_type=PropertyType ('=' default_value=PropertyValue)?
+;
+
+BehaviorType:
+    'on_change' | 'on_threshold' | 'periodic' | 'on_command' | 'custom'
+;
+
+BehaviorParam:
+    name=ID '=' value=PropertyValue
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' params*=BehaviorParam[','] ')')?
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+CronExpression:
+    'cron' '(' pattern=STRING ')'
+;
+
+TimeOfDay:
+    'at' '(' time=STRING ')'
+;
+
+Interval:
+    'every' '(' duration=STRING ')'
+;
+
+TimeExpression:
+    CronExpression | TimeOfDay | Interval
+;
+
+TimeTrigger:
+    'time' '(' time_expr=TimeExpression ')'
+;
+
+EntityTriggerType:
+    'state_change' | 'value_change' | 'above' | 'below' | 'equals'
+;
+
+EntityTrigger:
+    'entity' '(' entity=[EntityDef] ',' trigger_type=EntityTriggerType (',' condition=ComparisonCondition)? ')'
+;
+
+EventTrigger:
+    'event' '(' event_name=STRING (',' data=JsonObject)? ')'
+;
+
+ManualTrigger:
+    'manual'
+;
+
+TriggerDef:
+    TimeTrigger | EntityTrigger | EventTrigger | ManualTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not_in' | 'contains'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=STRING
+;
+
+StateCondition:
+    entity=[EntityDef] '.' 'state' operator=ComparisonOperator state_value=STRING
+;
+
+SimpleCondition:
+    ComparisonCondition | TimeCondition | StateCondition
+;
+
+ConditionExpression:
+    '(' condition=ConditionGroup ')' | SimpleCondition
+;
+
+ConditionGroup:
+    left=ConditionExpression (operator=LogicalOperator right=ConditionExpression)*
+;
+
+EntityAction:
+    'set' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' recipients*=STRING[','])? ')'
+;
+
+ScriptParam:
+    name=ID '=' value=PropertyValue
+;
+
+ScriptAction:
+    'script' '(' script_path=STRING (',' params*=ScriptParam[','])? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=STRING ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | ScriptAction | DelayAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

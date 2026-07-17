@@ -1,0 +1,349 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authMechanisms*=Authentication
+        entities*=Entity
+        automations*=Automation
+        properties*=Property
+        conditions*=Condition
+        actions*=Action
+        behaviors*=Behavior
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | ApiKeyAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)?
+        ('routingKey:' routingKey=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)?
+        ('method:' method=HTTPMethod)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'hybrid'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'bool' | 'int' | 'float' | 'str' | 'array' | 'object'
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING | ArrayValue | ObjectValue
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('dataType:' dataType=DataType)
+        ('value:' value=PropertyValue)?
+        ('unit:' unit=STRING)?
+        ('range:' min=FLOAT '-' max=FLOAT)?
+        ('readonly:' readonly=BOOL)?
+    )#
+    'end'
+;
+
+TriggerEvent:
+    'onPropertyChange' | 'onTimer' | 'onMessage' | 'onCommand' | 'manual'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startsWith' | 'endsWith'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+SimpleCondition:
+    'Condition' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+        ('logicalOp:' logicalOp=LogicalOperator)?
+    )#
+    'end'
+;
+
+CompoundCondition:
+    'CompoundCondition' name=ID
+    (
+        ('conditions:' '-' subConditions*=[Condition]['-'])
+        ('operator:' operator=LogicalOperator)
+    )#
+    'end'
+;
+
+Condition:
+    SimpleCondition | CompoundCondition
+;
+
+PropertyAction:
+    'PropertyAction' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+        ('operation:' operation=PropertyOperation)?
+    )#
+    'end'
+;
+
+PropertyOperation:
+    'set' | 'increment' | 'decrement' | 'toggle'
+;
+
+MessageAction:
+    'MessageAction' name=ID
+    (
+        ('broker:' broker=[Broker])
+        ('destination:' destination=STRING)
+        ('message:' message=STRING)
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+ServiceAction:
+    'ServiceAction' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('payload:' payload=STRING)?
+        ('headers:' headers=ObjectValue)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'milliseconds' | 'seconds' | 'minutes' | 'hours'
+;
+
+DelayAction:
+    'DelayAction' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+Action:
+    PropertyAction | MessageAction | ServiceAction | DelayAction
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('actions:' '-' actions*=[Action]['-'])
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+PropertyTrigger:
+    'PropertyTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+    )#
+;
+
+RepeatPattern:
+    'daily' | 'weekly' | 'monthly' | 'once' | 'interval'
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('time:' time=STRING)
+        ('repeat:' repeat=RepeatPattern)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('source:' source=[Entity])?
+    )#
+;
+
+ManualTrigger:
+    'ManualTrigger'
+    (
+        ('name:' name=STRING)
+    )#
+;
+
+AutomationTrigger:
+    PropertyTrigger | TimeTrigger | EventTrigger | ManualTrigger
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('maxRetries:' maxRetries=INT)?
+        ('timeout:' timeout=INT)?
+        ('delay:' delay=INT)?
+        ('mode:' mode=ExecutionMode)?
+    )#
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+Schedule:
+    'Schedule'
+    (
+        ('start:' startTime=STRING)
+        ('end:' endTime=STRING)?
+        ('days:' days+=DayOfWeek[','])?
+    )#
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('schedule:' schedule=Schedule)?
+        ('priority:' priority=INT)?
+        ('enabled:' enabled=BOOL)?
+        ('executionControl:' control=ExecutionControl)?
+    )#
+    'end'
+;

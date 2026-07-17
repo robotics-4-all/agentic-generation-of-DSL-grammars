@@ -1,0 +1,220 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'broker' 'redis' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    PlainAuth | TokenAuth | CertAuth
+;
+
+PlainAuth:
+    'auth' 'plain' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('state:' state=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'virtual'
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response' | 'notify'
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+Trigger:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityTrigger:
+    'entity' entity=[Entity] ('.' property=ID)? operator=TriggerOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' pattern=STRING
+;
+
+EventTrigger:
+    'event' event=STRING
+;
+
+TriggerOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'changed' | 'updated'
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | StateCondition
+;
+
+Condition:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+EntityCondition:
+    entity=[Entity] ('.' property=ID)? operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=STRING
+;
+
+StateCondition:
+    'state' operator=ComparisonOperator value=STRING
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    EntityAction | ServiceAction | DelayAction | NotificationAction
+;
+
+EntityAction:
+    'set' entity=[Entity] ('.' property=ID)? 'to' value=PropertyValue
+;
+
+ServiceAction:
+    'call' service=STRING ('with' parameters=ActionParameters)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ActionParameters:
+    '{' params*=ActionParam[','] '}'
+;
+
+ActionParam:
+    name=ID ':' value=PropertyValue
+;

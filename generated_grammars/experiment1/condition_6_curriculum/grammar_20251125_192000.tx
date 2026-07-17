@@ -1,0 +1,168 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+BrokerType:
+    'mqtt' | 'amqp' | 'redis'
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action=ActionDef
+;
+
+ActionDef:
+    'publish' '(' topic=STRING ',' message=PropertyValue ')'
+    | 'subscribe' '(' topic=STRING ')'
+    | 'call' '(' method=STRING (',' params*=PropertyValue[','])? ')'
+;
+
+TimeExpression:
+    'at' time=STRING
+    | 'every' interval=INT unit=TimeUnit
+    | 'cron' cron_expr=STRING
+;
+
+EntityTrigger:
+    'entity' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' time_expr=TimeExpression
+;
+
+EventTrigger:
+    'event' event_name=STRING
+;
+
+TriggerDef:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=STRING
+;
+
+ConditionExpr:
+    EntityCondition | TimeCondition | '(' condition=Condition ')'
+;
+
+Condition:
+    left=ConditionExpr (logical_op=LogicalOperator right=ConditionExpr)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID '=' value=PropertyValue
+    | 'call' entity=[Entity] '.' behavior=ID ('(' params*=PropertyValue[','] ')')?
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    'broker' name=ID
+    (
+        ('type:' broker_type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AuthConfig:
+    'auth' name=ID
+    (
+        ('type:' auth_type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('cert_path:' cert_path=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions*=Condition)?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

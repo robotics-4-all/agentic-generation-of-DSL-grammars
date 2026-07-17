@@ -1,0 +1,255 @@
+SmartEnvironmentModel:
+    metadata=Metadata?
+    (
+        brokers*=BrokerConfig
+        auth_mechanisms*=AuthMechanism
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('retain:' retain=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=Headers)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+Headers:
+    '{' items*=HeaderItem[','] '}'
+;
+
+HeaderItem:
+    name=STRING ':' value=STRING
+;
+
+AuthMechanism:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' properties=Properties)
+        ('behaviors:' behaviors=Behaviors)?
+        ('broker:' broker=[BrokerConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+Properties:
+    '{' items*=PropertyItem[','] '}'
+;
+
+PropertyItem:
+    name=ID ':' prop_type=PropertyType ('=' default_value=PropertyValue)?
+;
+
+PropertyType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behaviors:
+    '{' items*=BehaviorItem[','] '}'
+;
+
+BehaviorItem:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+BehaviorType:
+    'read_only' | 'write_only' | 'read_write' | 'notify' | 'execute'
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' conditions*=[Condition][','])?
+        ('actions:' actions*=[Action][','])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'event' entity=[Entity] event_type=STRING
+;
+
+StateTrigger:
+    'state' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' seconds=INT
+;
+
+Condition:
+    'condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionTerm:
+    SimpleCondition | GroupedCondition
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+GroupedCondition:
+    '(' expression=ConditionExpression ')'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    'action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[Entity])
+        ('operation:' operation=ActionOperation)
+        ('parameters:' parameters=ActionParameters)?
+        ('retry:' retry=RetryConfig)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'call_method' | 'send_message' | 'execute_script'
+;
+
+ActionOperation:
+    property=ID | method=ID | message=STRING | script=STRING
+;
+
+ActionParameters:
+    '{' items*=ActionParameter[','] '}'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+RetryConfig:
+    'retry' attempts=INT ('delay' delay_seconds=INT)?
+;

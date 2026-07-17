@@ -1,0 +1,300 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        brokers*=BrokerConfig
+        auth_configs*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+        conditions*=ConditionSpecification
+        actions*=ActionDefinition
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+TopicConfig:
+    'topic:' name=STRING ('qos:' qos=INT)?
+;
+
+EndpointConfig:
+    'endpoint:' path=STRING 'method:' method=HTTPMethod
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=KeyLocation)
+        ('name:' param_name=STRING)?
+    )#
+    'end'
+;
+
+KeyLocation:
+    'header' | 'query' | 'body'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+        ('topics:' '-' topics*=TopicConfig['-'])?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('port:' port=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+        ('endpoints:' '-' endpoints*=EndpointConfig['-'])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'system' | 'virtual'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+ObjectProperty:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' items*=ObjectProperty[','] '}'
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)? ('readonly:' readonly=BOOL)?
+;
+
+BehaviorDefinition:
+    'behavior:' name=ID 'trigger:' trigger=[ConditionSpecification] 'action:' action=[ActionDefinition]
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('location:' location=STRING)?
+        ('connection:' connection=[BrokerConfig])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'immediate' | 'delayed' | 'scheduled' | 'queued' | 'parallel'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=[ConditionSpecification])
+        ('conditions:' '-' conditions*=[ConditionSpecification]['-'])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('execution:' execution=ExecutionControl)?
+        ('priority:' priority=INT)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '<=' | '>' | '>=' | 'contains' | 'matches'
+;
+
+AddOperator:
+    '+' | '-'
+;
+
+MulOperator:
+    '*' | '/' | '%'
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+PropertyReference:
+    entity=[EntityDefinition] '.' property=ID ('.' sub_property=ID)*
+;
+
+FunctionArgument:
+    LiteralValue | PropertyReference
+;
+
+FunctionCall:
+    name=ID '(' args*=FunctionArgument[','] ')'
+;
+
+Factor:
+    '(' expression=LogicalExpression ')' |
+    value=LiteralValue |
+    reference=PropertyReference |
+    function_call=FunctionCall
+;
+
+Term:
+    left=Factor (operator=MulOperator right=Factor)*
+;
+
+ArithmeticExpression:
+    left=Term (operator=AddOperator right=Term)*
+;
+
+ComparisonExpression:
+    left=ArithmeticExpression (operator=ComparisonOperator right=ArithmeticExpression)?
+;
+
+NotExpression:
+    ('not')? operand=ComparisonExpression
+;
+
+AndExpression:
+    left=NotExpression ('and' right=NotExpression)*
+;
+
+OrExpression:
+    left=AndExpression ('or' right=AndExpression)*
+;
+
+LogicalExpression:
+    or_expr=OrExpression
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'send_message' | 'execute_command' | 'notify' | 'trigger_automation'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[EntityDefinition])?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry:' retry=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

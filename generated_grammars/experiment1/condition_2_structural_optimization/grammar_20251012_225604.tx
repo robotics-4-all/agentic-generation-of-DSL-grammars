@@ -1,0 +1,386 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (authentication*=Authentication)
+        (entities*=Entity)
+        (automations*=Automation)
+        (conditions*=Condition)
+        (actions*=Action)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('email:' email=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'system' | 'virtual'
+;
+
+DataType:
+    'string' | 'float' | 'int' | 'bool' | 'json' | 'array' | 'object'
+;
+
+BehaviorType:
+    'periodic' | 'triggered' | 'reactive' | 'adaptive' | 'learning'
+;
+
+CapabilityType:
+    'sensing' | 'acting' | 'processing' | 'communication' | 'storage'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'loop'
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+ActionType:
+    'set' | 'trigger' | 'notify' | 'execute' | 'publish' | 'call'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash' | 'lua'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | JsonObject | JsonArray
+;
+
+JsonObject:
+    '{' items*=JsonObjectItem[','] '}'
+;
+
+JsonObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+JsonArray:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ParameterList:
+    '[' params*=Parameter[','] ']'
+;
+
+Parameter:
+    name=ID ':' type=DataType ('=' value=PropertyValue)?
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)? ('writable:' writable=BOOL)?
+;
+
+Behavior:
+    name=ID ':' behaviorType=BehaviorType ('params:' params=ParameterList)?
+;
+
+Capability:
+    name=ID ':' capabilityType=CapabilityType ('level:' level=INT)?
+;
+
+DaysList:
+    '[' days*=DayOfWeek[','] ']'
+;
+
+Schedule:
+    'Schedule'
+    (
+        ('start:' start=STRING)?
+        ('end:' end=STRING)?
+        ('days:' days=DaysList)?
+        ('repeat:' repeat=BOOL)?
+    )#
+    'end'
+;
+
+CronExpression:
+    'cron:' expression=STRING
+;
+
+IntervalExpression:
+    'every:' interval=INT unit=TimeUnit
+;
+
+FixedTimeExpression:
+    'at:' time=STRING
+;
+
+TimeExpression:
+    CronExpression | IntervalExpression | FixedTimeExpression
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+FunctionCall:
+    name=ID '(' args*=ValueExpression[','] ')'
+;
+
+ValueExpression:
+    EntityPropertyRef | LiteralValue | FunctionCall
+;
+
+StateCheck:
+    entity=[Entity] 'is' state=STRING
+;
+
+RangeCheck:
+    value=ValueExpression 'in' 'range' '[' min=FLOAT ',' max=FLOAT ']'
+;
+
+ExistenceCheck:
+    entity=[Entity] 'exists'
+;
+
+PredicateExpression:
+    StateCheck | RangeCheck | ExistenceCheck
+;
+
+ComparisonExpression:
+    '(' expr=LogicalExpression ')' |
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression |
+    predicate=PredicateExpression
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+EntityTrigger:
+    'entity:' entity=[Entity] 'property:' property=ID ('value:' value=PropertyValue)?
+;
+
+TimeTrigger:
+    'time:' time=TimeExpression
+;
+
+EventTrigger:
+    'event:' event=STRING ('data:' data=PropertyValue)?
+;
+
+ConditionTrigger:
+    'condition:' condition=[Condition]
+;
+
+AutomationTrigger:
+    EntityTrigger | TimeTrigger | EventTrigger | ConditionTrigger
+;
+
+EntityAction:
+    'entity:' entity=[Entity] 'property:' property=ID 'value:' value=PropertyValue
+;
+
+ServiceAction:
+    'service:' service=STRING 'method:' method=STRING ('params:' params=ParameterList)?
+;
+
+MessageAction:
+    'message:' broker=[MessageBroker] 'topic:' topic=STRING 'payload:' payload=PropertyValue
+;
+
+ScriptAction:
+    'script:' script=STRING ('language:' language=ScriptLanguage)?
+;
+
+ActionTarget:
+    EntityAction | ServiceAction | MessageAction | ScriptAction
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+        ('queryParam:' queryParam=STRING)?
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caCertPath:' caCertPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | ApiKeyAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('baseTopic:' baseTopic=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('queue:' queue=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('basePath:' basePath=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker | HTTPBroker
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+    )#
+    'end'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('description:' description=STRING)?
+        ('expression:' expression=LogicalExpression)
+    )#
+    'end'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('description:' description=STRING)?
+        ('type:' type=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' parameters=ParameterList)?
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('description:' description=STRING)?
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('mode:' mode=ExecutionMode)?
+        ('schedule:' schedule=Schedule)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

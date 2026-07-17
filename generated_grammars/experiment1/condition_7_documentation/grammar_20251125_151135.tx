@@ -1,0 +1,222 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'virtual'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+PropertyDef:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' action=ActionDef
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'single' | 'queued' | 'parallel' | 'restart'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' value=INT unit=TimeUnit
+;
+
+OnceSchedule:
+    'once' datetime=STRING
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'event' entity=[EntityDef] '.' property=ID
+;
+
+StateTrigger:
+    'state' entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOp:
+    'and' | 'or'
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+ConditionDef:
+    left=SimpleCondition (operator=LogicalOp right=SimpleCondition)*
+;
+
+ActionParam:
+    name=ID ':' value=PropertyValue
+;
+
+ActionParams:
+    '{' items*=ActionParam[','] '}'
+;
+
+EntityAction:
+    'set' entity=[EntityDef] '.' property=ID 'to' value=PropertyValue
+;
+
+ServiceAction:
+    'call' service=STRING ('with' params=ActionParams)?
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ActionDef:
+    EntityAction | ServiceAction | NotificationAction | DelayAction
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('mode:' mode=ExecutionMode)?
+    )#
+    'end'
+;

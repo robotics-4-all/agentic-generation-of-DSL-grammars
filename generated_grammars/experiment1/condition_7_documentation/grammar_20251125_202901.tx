@@ -1,0 +1,303 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication=Authentication?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+WebSocketBroker:
+    'Broker<WebSocket>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('path:' path=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | HTTPBroker | WebSocketBroker
+;
+
+AuthType:
+    'basic' | 'token' | 'apikey' | 'oauth'
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('type:' type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('apikey:' apikey=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'list' | 'dict'
+;
+
+DictItem:
+    key=STRING ':' value=PropertyValue
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+List:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | List | Dict
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' defaultvalue=PropertyValue)?
+;
+
+Behavior:
+    name=ID ':' action=STRING
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+Time:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeExpression:
+    time=Time | cron=STRING
+;
+
+RepeatPattern:
+    'daily' | 'weekly' | 'monthly' | 'yearly' | ('interval:' interval=INT unit=TimeUnit)
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('time:' time=TimeExpression)
+        ('repeat:' repeat=RepeatPattern)?
+    )#
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+StateCondition:
+    operator=ComparisonOperator value=PropertyValue
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('condition:' condition=StateCondition)
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('source:' source=STRING)?
+    )#
+;
+
+Trigger:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeExpression
+;
+
+ValueCondition:
+    left=PropertyValue operator=ComparisonOperator right=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ConditionExpression:
+    '(' condition=Condition ')' | SimpleCondition
+;
+
+Condition:
+    left=ConditionExpression (operator=LogicalOperator right=ConditionExpression)*
+;
+
+ConditionGroup:
+    conditions*=Condition
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+        ('method:' method=STRING)?
+    )#
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'slack' | 'discord'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('priority:' priority=NotificationPriority)?
+    )#
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash' | 'lua'
+;
+
+ScriptAction:
+    'ScriptAction'
+    (
+        ('script:' script=STRING)
+        ('language:' language=ScriptLanguage)?
+    )#
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+RetryPolicy:
+    'RetryPolicy'
+    (
+        ('attempts:' attempts=INT)
+        ('delay:' delay=INT)?
+    )#
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('timeout:' timeout=INT)?
+        ('retry:' retry=RetryPolicy)?
+    )#
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=Action['-'])
+        ('execution:' execution=ExecutionControl)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

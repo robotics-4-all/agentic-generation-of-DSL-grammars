@@ -1,0 +1,290 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+ImportStm:
+    'import' importURI=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)
+        ('description:' description=STRING)
+        ('system_info:' system_info=SystemInfo)
+    )#
+    'end'
+;
+
+SystemInfo:
+    'system'
+    (
+        ('platform:' platform=STRING)
+        ('arch:' arch=STRING)
+        ('os_version:' os_version=STRING)
+        ('node_id:' node_id=STRING)
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)
+        ('ssl:' ssl=BOOL)
+        ('auth:' auth=[Authentication])
+        ('topics:' '[' topics*=STRING[','] ']')
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)
+        ('exchange:' exchange=STRING)
+        ('ssl:' ssl=BOOL)
+        ('auth:' auth=[Authentication])
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)
+        ('auth:' auth=[Authentication])
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'auth' 'certificate' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)
+    )#
+    'end'
+;
+
+Entity:
+    SensorEntity | ActuatorEntity | HybridEntity
+;
+
+SensorEntity:
+    'entity' 'sensor' name=ID
+    (
+        ('description:' description=STRING)
+        ('location:' location=STRING)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('properties:' '[' properties*=Property[','] ']')
+        ('behaviors:' '[' behaviors*=Behavior[','] ']')
+        ('sample_rate:' sample_rate=NUMBER)
+        ('enabled:' enabled=BOOL)
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'entity' 'actuator' name=ID
+    (
+        ('description:' description=STRING)
+        ('location:' location=STRING)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('properties:' '[' properties*=Property[','] ']')
+        ('behaviors:' '[' behaviors*=Behavior[','] ']')
+        ('commands:' '[' commands*=Command[','] ']')
+        ('enabled:' enabled=BOOL)
+    )#
+    'end'
+;
+
+HybridEntity:
+    'entity' 'hybrid' name=ID
+    (
+        ('description:' description=STRING)
+        ('location:' location=STRING)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('properties:' '[' properties*=Property[','] ']')
+        ('behaviors:' '[' behaviors*=Behavior[','] ']')
+        ('commands:' '[' commands*=Command[','] ']')
+        ('sample_rate:' sample_rate=NUMBER)
+        ('enabled:' enabled=BOOL)
+    )#
+    'end'
+;
+
+Property:
+    name=ID ':' type=PropertyType ('=' default=PropertyValue)?
+;
+
+PropertyType:
+    'bool' | 'int' | 'float' | 'string' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING | Array | Object
+;
+
+Array:
+    '[' values*=PropertyValue[','] ']'
+;
+
+Object:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+Behavior:
+    name=ID ':' behavior_type=BehaviorType ('(' params=BehaviorParams ')')?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'threshold' | 'custom'
+;
+
+BehaviorParams:
+    param_pairs*=ParamPair[',']
+;
+
+ParamPair:
+    key=STRING ':' value=PropertyValue
+;
+
+Command:
+    name=ID ':' command_type=STRING ('(' params=BehaviorParams ')')?
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('description:' description=STRING)
+        ('enabled:' enabled=BOOL)
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '[' conditions*=Condition[','] ']')
+        ('actions:' '[' actions*=Action[','] ']')
+        ('execution_mode:' execution_mode=ExecutionMode)
+        ('priority:' priority=INT)
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'queued' | 'scheduled' | 'parallel'
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'event' entity=[Entity] '.' event_name=ID
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+StateTrigger:
+    'state' entity=[Entity] '.' property_name=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' value=NUMBER unit=TimeUnit
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property_name=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+Action:
+    CommandAction | SetPropertyAction | NotificationAction | ScriptAction
+;
+
+CommandAction:
+    'command' entity=[Entity] '.' command_name=ID ('(' params=BehaviorParams ')')?
+;
+
+SetPropertyAction:
+    'set' entity=[Entity] '.' property_name=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('to:' target=STRING)?
+;
+
+ScriptAction:
+    'script' script_path=STRING ('params:' params=BehaviorParams)?
+;

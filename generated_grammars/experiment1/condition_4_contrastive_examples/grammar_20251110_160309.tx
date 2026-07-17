@@ -1,0 +1,315 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication=AuthenticationConfig?
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+        conditions*=ConditionSpecification
+        actions*=ActionDefinition
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+KeyValuePair:
+    key=STRING ':' value=STRING
+;
+
+AuthType:
+    'basic' | 'token' | 'oauth' | 'certificate'
+;
+
+BasicAuth:
+    'basic' '('
+        'username:' username=STRING ','
+        'password:' password=STRING
+    ')'
+;
+
+TokenAuth:
+    'token' '(' 'value:' token=STRING ')'
+;
+
+OAuthConfig:
+    'oauth' '('
+        'client_id:' clientId=STRING ','
+        'client_secret:' clientSecret=STRING ','
+        'scope:' scope=STRING
+    ')'
+;
+
+CertificateAuth:
+    'certificate' '('
+        'cert_path:' certPath=STRING ','
+        'key_path:' keyPath=STRING
+    ')'
+;
+
+CredentialConfig:
+    BasicAuth | TokenAuth | OAuthConfig | CertificateAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ArrayValue | ObjectValue
+;
+
+PropertyDefinition:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+CronExpression:
+    'cron' expression=STRING
+;
+
+TimeInterval:
+    'interval' duration=INT unit=TimeUnit
+;
+
+TimeSchedule:
+    CronExpression | TimeInterval
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+PropertyTrigger:
+    'property' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'event' eventName=STRING
+;
+
+TriggerCondition:
+    PropertyTrigger | TimeTrigger | EventTrigger
+;
+
+StateValue:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+BehaviorDefinition:
+    'behavior' name=ID '{'
+        'trigger:' trigger=TriggerCondition
+        'action:' action=[ActionDefinition]
+    '}'
+;
+
+ExecutionControl:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+TimeValue:
+    TIME | DATE | DATETIME
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+EntityPropertyRef:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+Operand:
+    PropertyValue | EntityPropertyRef
+;
+
+EntityCondition:
+    entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator timeValue=TimeValue
+;
+
+ValueCondition:
+    leftOperand=Operand operator=ComparisonOperator rightOperand=Operand
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+GroupedCondition:
+    '(' expression=LogicalExpression ')'
+;
+
+LogicalTerm:
+    SimpleCondition | GroupedCondition
+;
+
+LogicalExpression:
+    terms+=LogicalTerm (operators+=LogicalOperator terms+=LogicalTerm)*
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notify' | 'trigger_automation' | 'call_service'
+;
+
+EntityTarget:
+    'entity' entity=[EntityDefinition] ('.' property=ID)?
+;
+
+ServiceTarget:
+    'service' serviceName=STRING endpoint=STRING
+;
+
+NotificationTarget:
+    'notification' channel=STRING
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | NotificationTarget
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' '-' headers*=KeyValuePair['-'])?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+AuthenticationConfig:
+    'Authentication'
+    (
+        ('type:' authType=AuthType)
+        ('credentials:' credentials=CredentialConfig)
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('state:' initialState=StateValue)?
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('conditions:' '-' conditions*=[ConditionSpecification]['-'])
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('execution:' executionControl=ExecutionControl)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=INT)?
+        ('retry:' retryCount=INT)?
+    )#
+    'end'
+;
+
+TIME: /([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/;
+DATE: /\d{4}-\d{2}-\d{2}/;
+DATETIME: /\d{4}-\d{2}-\d{2}T([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/;
+
+Comment: CommentLine | CommentBlock;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;

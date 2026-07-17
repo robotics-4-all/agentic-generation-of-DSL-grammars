@@ -1,0 +1,250 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    'Auth' name=ID
+    (
+        ('type:' authType=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('keyFile:' keyFile=STRING)?
+        ('certFile:' certFile=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate' | 'oauth2' | 'none'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('basePath:' basePath=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | JsonObject | JsonArray
+;
+
+JsonObject:
+    '{' items*=JsonItem[','] '}'
+;
+
+JsonItem:
+    key=STRING ':' value=PropertyValue
+;
+
+JsonArray:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response' | 'notify'
+;
+
+BehaviorDef:
+    name=ID ':' action=BehaviorAction
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' value=INT unit=TimeUnit ')'
+;
+
+AtSchedule:
+    'at' '(' time=TimeValue ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | AtSchedule
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+TriggerOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'changed' | 'above' | 'below'
+;
+
+EntityTrigger:
+    'entity' '(' entity=[EntityDef] ('.' property=ID)? operator=TriggerOperator value=PropertyValue ')'
+;
+
+EventTrigger:
+    'event' '(' eventType=STRING (',' data=JsonObject)? ')'
+;
+
+TriggerDef:
+    TimeTrigger | EntityTrigger | EventTrigger
+;
+
+SystemAttribute:
+    'sunrise' | 'sunset' | 'dayOfWeek' | 'isWeekend' | 'isHoliday'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'contains'
+;
+
+EntityCondition:
+    entity=[EntityDef] ('.' property=ID)? operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+SystemCondition:
+    'system' '.' attribute=SystemAttribute operator=ComparisonOperator value=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | SystemCondition
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+GroupedCondition:
+    '(' group=ConditionGroup ')'
+;
+
+Condition:
+    SimpleCondition | GroupedCondition
+;
+
+ConditionGroup:
+    conditions+=Condition (logicalOp=LogicalOperator conditions+=Condition)*
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'lua' | 'shell'
+;
+
+EntityAction:
+    'entity' '(' target=[EntityDef] ('.' property=ID)? '=' value=PropertyValue ')'
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' channel=STRING)? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+ScriptAction:
+    'script' '(' code=STRING (',' language=ScriptLanguage)? ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

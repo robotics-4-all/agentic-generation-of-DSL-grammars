@@ -1,0 +1,251 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth=AuthenticationConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('retain:' retain=BOOL)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+CoAPBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('confirmable:' confirmable=BOOL)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | HTTPBroker | CoAPBroker
+;
+
+AuthType:
+    'basic' | 'token' | 'oauth' | 'certificate'
+;
+
+BasicAuth:
+    'basic' '(' username=STRING ',' password=STRING ')'
+;
+
+TokenAuth:
+    'token' '(' token=STRING ')'
+;
+
+OAuthAuth:
+    'oauth' '(' clientId=STRING ',' clientSecret=STRING ')'
+;
+
+CertAuth:
+    'cert' '(' certPath=STRING ',' keyPath=STRING ')'
+;
+
+Credentials:
+    BasicAuth | TokenAuth | OAuthAuth | CertAuth
+;
+
+AuthenticationConfig:
+    'Authentication'
+    (
+        ('type:' type=AuthType)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'read' | 'write' | 'execute' | 'notify' | 'subscribe'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+ConditionValue:
+    FLOAT | INT | STRING | BOOL | PropertyReference
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ComparisonCondition:
+    left=PropertyReference operator=ComparisonOperator right=ConditionValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+StateCondition:
+    entity=[Entity] 'state' operator=ComparisonOperator value=STRING
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | StateCondition
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+SetAction:
+    'set' target=PropertyReference 'to' value=ConditionValue
+;
+
+ParamPair:
+    key=ID ':' value=ConditionValue
+;
+
+ActionParams:
+    '{' pairs*=ParamPair[','] '}'
+;
+
+CallAction:
+    'call' entity=[Entity] '.' behavior=ID ('with' params=ActionParams)?
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+Action:
+    SetAction | CallAction | NotifyAction | DelayAction
+;
+
+DateValue:
+    year=INT '/' month=INT '/' day=INT
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'every' interval=INT unit=TimeUnit
+;
+
+OnceSchedule:
+    'once' 'at' time=TimeValue ('on' date=DateValue)?
+;
+
+Schedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' '-' conditions*=Condition['-'])
+        ('actions:' '-' actions*=Action['-'])
+        ('schedule:' schedule=Schedule)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

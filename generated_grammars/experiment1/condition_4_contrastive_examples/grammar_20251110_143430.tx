@@ -1,0 +1,321 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata
+        brokers*=BrokerConfig
+        auth_mechanisms*=AuthMechanism
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'hybrid'
+;
+
+PropertyType:
+    'int' | 'float' | 'string' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ValueRange:
+    '(' min=NUMBER ',' max=NUMBER ')'
+;
+
+EntityState:
+    'online' | 'offline' | 'error' | 'maintenance' | 'unknown'
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'conditional' | 'manual'
+;
+
+TriggerEvent:
+    'time' | 'property_change' | 'external_event' | 'condition_met'
+;
+
+BehaviorParams:
+    '{' param_pairs*=BehaviorParam[','] '}'
+;
+
+BehaviorParam:
+    name=STRING ':' value=PropertyValue
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+ExecutionControl:
+    'sync' | 'async' | 'parallel' | 'sequential'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+AuthMechanism:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('queue:' queue=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+PropertyDef:
+    name=ID ':' prop_type=PropertyType ('=' default_value=PropertyValue)? ('range:' range=ValueRange)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('trigger:' trigger=TriggerEvent)? ('params:' params=BehaviorParams)?
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('state:' state=EntityState)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron:' pattern=STRING
+;
+
+IntervalSchedule:
+    'interval:' duration=INT unit=TimeUnit
+;
+
+OnceSchedule:
+    'once:' timestamp=STRING
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+TimeBasedTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+EventBasedTrigger:
+    'event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+StateChangeTrigger:
+    'state_change' '(' entity=[EntityDef] ',' property=ID ')'
+;
+
+AutomationTrigger:
+    TimeBasedTrigger | EventBasedTrigger | StateChangeTrigger
+;
+
+PropertyCondition:
+    entity=[EntityDef] '.' property=ID comparison=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparison=ComparisonOperator time_value=STRING
+;
+
+StateCondition:
+    entity=[EntityDef] '.' 'state' comparison=ComparisonOperator state_value=EntityState
+;
+
+SimpleCondition:
+    PropertyCondition | TimeCondition | StateCondition
+;
+
+ConditionExpression:
+    SimpleCondition | '(' condition=LogicalCondition ')'
+;
+
+LogicalCondition:
+    left=ConditionExpression (operator=LogicalOperator right=ConditionExpression)*
+;
+
+ConditionSpec:
+    logical_conditions*=LogicalCondition
+;
+
+ServiceParams:
+    param_pairs*=ServiceParam[',']
+;
+
+ServiceParam:
+    name=ID '=' value=PropertyValue
+;
+
+ServiceCall:
+    service_name=STRING '(' params=ServiceParams? ')'
+;
+
+MessagePair:
+    key=STRING ':' value=PropertyValue
+;
+
+MessageSpec:
+    '{' message_pairs*=MessagePair[','] '}'
+;
+
+BrokerTarget:
+    'broker:' broker=[BrokerConfig] ('topic:' topic=STRING)?
+;
+
+EntityTarget:
+    'entity:' entity=[EntityDef]
+;
+
+ExternalTarget:
+    'external:' endpoint=STRING
+;
+
+MessageTarget:
+    BrokerTarget | EntityTarget | ExternalTarget
+;
+
+SetPropertyAction:
+    'set' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+CallServiceAction:
+    'call' service=ServiceCall
+;
+
+SendMessageAction:
+    'send' message=MessageSpec 'to' target=MessageTarget
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ActionDef:
+    SetPropertyAction | CallServiceAction | SendMessageAction | DelayAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' conditions=ConditionSpec)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

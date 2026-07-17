@@ -1,0 +1,258 @@
+SmAutoModel:
+    (
+        imports*=Import
+        metadata=Metadata
+        broker_configs*=BrokerConfig
+        auth_configs*=AuthConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Import:
+    'import' module_name=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'virtual'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'list' | 'dict' | 'datetime'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'in' | 'not_in' | 'contains'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | List | Dict
+;
+
+List:
+    '[' items*=PropertyValue[','] ']'
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    key=STRING ':' value=PropertyValue
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+Parameter:
+    name=ID ':' data_type=DataType
+;
+
+Argument:
+    name=ID '=' value=PropertyValue
+;
+
+Capability:
+    name=ID '(' parameters*=Parameter[','] ')'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('properties:' properties*=Property)?
+        ('capabilities:' capabilities*=Capability)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron:' expression=STRING
+;
+
+IntervalSchedule:
+    'interval:' value=INT unit=TimeUnit
+;
+
+OnceSchedule:
+    'once:' datetime=STRING
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] '.' event_name=ID ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+ManualTrigger:
+    'Manual' '(' trigger_name=ID ')'
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger | ManualTrigger
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+EntityAction:
+    'Execute' entity=[Entity] '.' capability=ID '(' arguments*=Argument[','] ')'
+;
+
+NotificationAction:
+    'Notify' '(' message=STRING ',' recipients*=STRING[','] ')'
+;
+
+DelayAction:
+    'Delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+ScriptAction:
+    'Script' '(' script_path=STRING ',' parameters*=Parameter[','] ')'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions*=Condition)?
+        ('actions:' actions*=Action)
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

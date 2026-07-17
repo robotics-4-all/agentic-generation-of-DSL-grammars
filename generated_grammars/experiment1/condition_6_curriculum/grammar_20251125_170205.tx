@@ -1,0 +1,230 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('timeout:' timeout=INT)?
+        ('ssl_verify:' ssl_verify=BOOL)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+BehaviorType:
+    'read_only' | 'write_only' | 'read_write' | 'event_driven' | 'polling'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=ConditionDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'TimeTrigger' '(' schedule=ScheduleExpr ')'
+;
+
+EventTrigger:
+    'EventTrigger' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+StateTrigger:
+    'StateTrigger' '(' entity=[EntityDef] ',' property=ID ',' condition=ComparisonOp ',' value=PropertyValue ')'
+;
+
+ScheduleExpr:
+    CronExpr | IntervalExpr | TimeExpr
+;
+
+CronExpr:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalExpr:
+    'interval' '(' seconds=INT ')'
+;
+
+TimeExpr:
+    'time' '(' hour=INT ':' minute=INT ')'
+;
+
+ConditionDef:
+    left=SimpleCondition (logical_op=LogicalOp right=SimpleCondition)*
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOp:
+    'and' | 'or'
+;
+
+ActionDef:
+    SetPropertyAction | SendMessageAction | CallServiceAction | DelayAction
+;
+
+SetPropertyAction:
+    'SetProperty' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+SendMessageAction:
+    'SendMessage' '(' broker=[BrokerConfig] ',' topic=STRING ',' message=STRING ')'
+;
+
+CallServiceAction:
+    'CallService' '(' service_url=STRING ',' method=HTTPMethod ',' payload=STRING? ')'
+;
+
+DelayAction:
+    'Delay' '(' seconds=INT ')'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single_shot' | 'continuous'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

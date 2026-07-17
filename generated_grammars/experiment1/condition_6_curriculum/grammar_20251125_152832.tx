@@ -1,0 +1,175 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'MQTT' | 'AMQP' | 'HTTP' | 'WebSocket'
+;
+
+Broker:
+    'broker' name=ID
+    (
+        ('type:' brokerType=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('protocol:' protocol=STRING)?
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate' | 'oauth'
+;
+
+Authentication:
+    'auth' name=ID
+    (
+        ('type:' authType=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('certificate:' certificate=STRING)?
+        ('key:' key=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'device' | 'virtual'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'read' | 'write' | 'notify' | 'execute' | 'toggle'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[Broker])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+CronExpression:
+    'cron' expression=STRING
+;
+
+TimeInterval:
+    'every' interval=INT unit=TimeUnit
+;
+
+SpecificTime:
+    'at' time=STRING
+;
+
+TimeSchedule:
+    CronExpression | TimeInterval | SpecificTime
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventOperator:
+    'changed' | 'equals' | 'greater' | 'less' | 'contains'
+;
+
+EventTrigger:
+    'event' entity=[Entity] '.' property=ID operator=EventOperator value=PropertyValue
+;
+
+StateTrigger:
+    'state' entity=[Entity] '.' property=ID operator=EventOperator value=PropertyValue
+;
+
+Trigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Condition:
+    left=SimpleCondition (logicalOp=LogicalOperator right=SimpleCondition)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('via' channel=STRING)?
+;
+
+ScriptAction:
+    'execute' script=STRING ('with' parameters=STRING)?
+;
+
+Action:
+    EntityAction | NotificationAction | ScriptAction
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

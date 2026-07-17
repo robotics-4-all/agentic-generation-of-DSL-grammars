@@ -1,0 +1,228 @@
+SmartEnvironment:
+    (
+        imports*=Import
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=Authentication
+        entities*=EntityDef
+        automations*=AutomationDecl
+    )#
+;
+
+Import:
+    'import' importURI=STRING
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'broker' 'redis' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+PlainAuth:
+    'auth' 'plain' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    PlainAuth | TokenAuth | CertAuth
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'system' | 'virtual'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=VALUE)?
+;
+
+TriggerSpec:
+    'on_message' | 'on_change' | 'periodic' | 'manual'
+;
+
+ActionSpec:
+    'publish' | 'store' | 'forward' | 'process' | 'alert'
+;
+
+BehaviorDef:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerSpec)
+        ('action:' action=ActionSpec)
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' properties*=PropertyDef)
+        ('behaviors:' behaviors*=BehaviorDef)
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+SimpleCondition:
+    entityRef=[EntityDef] '.' propertyName=ID comparisonOp=ComparisonOperator value=VALUE
+;
+
+LogicalCondition:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+ConditionSpec:
+    logicalCondition=LogicalCondition
+;
+
+PublishAction:
+    'publish' topic=STRING message=VALUE broker=[BrokerConfig]?
+;
+
+CallAction:
+    'call' entity=[EntityDef] method=STRING params=ParamList?
+;
+
+SetAction:
+    'set' entity=[EntityDef] property=ID value=VALUE
+;
+
+NotifyAction:
+    'notify' message=STRING channel=STRING?
+;
+
+ActionDef:
+    PublishAction | CallAction | SetAction | NotifyAction
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' seconds=INT
+;
+
+OnceSchedule:
+    'once' datetime=STRING
+;
+
+ScheduleSpec:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+AutomationDecl:
+    'automation' name=ID
+    (
+        ('conditions:' conditions*=ConditionSpec)
+        ('actions:' actions*=ActionDef)
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('schedule:' schedule=ScheduleSpec)?
+    )#
+    'end'
+;
+
+Parameter:
+    name=ID '=' value=VALUE
+;
+
+ParamList:
+    '(' params*=Parameter[','] ')'
+;
+
+NULL:
+    'null'
+;
+
+VALUE:
+    FLOAT | INT | STRING | BOOL | NULL
+;

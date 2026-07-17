@@ -1,0 +1,208 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth*=AuthenticationConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate' | 'oauth'
+;
+
+AuthenticationConfig:
+    'auth' name=ID
+    (
+        ('type:' auth_type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('topic_prefix:' topic_prefix=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('base_path:' base_path=STRING)?
+        ('api_key:' api_key=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'other'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+ParameterDef:
+    name=ID ':' param_type=DataType
+;
+
+ActionDef:
+    name=ID '(' parameters*=ParameterDef[','] ')'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('actions:' '-' actions*=ActionDef['-'])?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TIME:
+    /([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/
+;
+
+TimeSpec:
+    'at' time=TIME | 'every' interval=INT unit=TimeUnit
+;
+
+TimeTrigger:
+    'time' time_spec=TimeSpec
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains'
+;
+
+StateTrigger:
+    'state' entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+EventTrigger:
+    'event' event_type=STRING
+;
+
+TriggerDef:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+StateCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=TIME
+;
+
+PropertyCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator other_entity=[EntityDef] '.' other_property=ID
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+Condition:
+    '(' condition=ConditionGroup ')' |
+    StateCondition |
+    TimeCondition |
+    PropertyCondition
+;
+
+ConditionGroup:
+    conditions+=Condition (logical_op=LogicalOperator conditions+=Condition)*
+;
+
+PropertyReference:
+    entity=[EntityDef] '.' property=ID
+;
+
+ArgumentValue:
+    PropertyValue | PropertyReference
+;
+
+EntityAction:
+    entity=[EntityDef] action=ID '(' arguments*=ArgumentValue[','] ')'
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+ActionCall:
+    EntityAction | DelayAction | NotificationAction
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionCall['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

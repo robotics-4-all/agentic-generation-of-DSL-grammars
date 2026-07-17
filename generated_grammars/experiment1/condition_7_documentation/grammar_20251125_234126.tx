@@ -1,0 +1,251 @@
+SmAutoModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        brokers*=MessageBroker
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Import:
+    'import' importURI=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    AuthPlain | AuthToken | AuthCertificate
+;
+
+AuthPlain:
+    'username:' username=STRING
+    'password:' password=STRING
+;
+
+AuthToken:
+    'token:' token=STRING
+;
+
+AuthCertificate:
+    'cert:' cert=STRING
+    'key:' key=STRING
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+CoAPBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | HTTPBroker | CoAPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'virtual'
+;
+
+DataType:
+    'int' | 'float' | 'bool' | 'string' | 'list' | 'dict'
+;
+
+List:
+    '[' items*=ListItem[','] ']'
+;
+
+ListItem:
+    FLOAT | INT | BOOL | STRING | List | Dict
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    name=STRING ':' value=DictValue
+;
+
+DictValue:
+    FLOAT | INT | BOOL | STRING | List | Dict
+;
+
+AttributeValue:
+    FLOAT | INT | BOOL | STRING | List | Dict
+;
+
+Attribute:
+    name=ID ':' dtype=DataType ('=' default=AttributeValue)?
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('attributes:' '-' attributes*=Attribute['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+Time:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+CronExpression:
+    'cron:' expression=STRING
+;
+
+TimeInterval:
+    'interval:' duration=INT unit=TimeUnit
+;
+
+SpecificTime:
+    'at:' time=Time
+;
+
+TimeExpression:
+    CronExpression | TimeInterval | SpecificTime
+;
+
+TimeTrigger:
+    'time' '(' time=TimeExpression ')'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+AttributeRef:
+    entity=[Entity] '.' attribute=ID
+;
+
+AttributeCondition:
+    attribute=AttributeRef operator=ComparisonOperator value=AttributeValue
+;
+
+StateCondition:
+    'state' operator=ComparisonOperator value=STRING
+;
+
+EntityCondition:
+    AttributeCondition | StateCondition
+;
+
+EntityTrigger:
+    'entity' '(' entity=[Entity] ',' condition=EntityCondition ')'
+;
+
+EventTrigger:
+    'event' '(' event=STRING ')'
+;
+
+TriggerCondition:
+    TimeTrigger | EntityTrigger | EventTrigger
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=Time
+;
+
+PrimitiveCondition:
+    AttributeCondition | StateCondition | TimeCondition
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' attribute=ID '=' value=AttributeValue
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' channel=STRING)? ')'
+;
+
+ScriptAction:
+    'script' '(' script=STRING ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+Action:
+    EntityAction | NotificationAction | ScriptAction | DelayAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+FQN:
+    ID ('.' ID)*
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

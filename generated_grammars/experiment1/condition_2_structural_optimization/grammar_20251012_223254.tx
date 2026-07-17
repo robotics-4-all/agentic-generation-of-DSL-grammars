@@ -1,0 +1,406 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfiguration
+        authentication*=AuthenticationMechanism
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+        conditions*=ConditionSpecification
+        actions*=ActionDefinition
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderItem:
+    key=STRING ':' value=STRING
+;
+
+HeaderList:
+    '[' headers*=HeaderItem[','] ']'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'timestamp' | 'array'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | ArrayValue | ObjectValue
+;
+
+RangeConstraint:
+    'range' '(' min=NUMBER ',' max=NUMBER ')'
+;
+
+LengthConstraint:
+    'length' '(' min=INT ',' max=INT ')'
+;
+
+PatternConstraint:
+    'pattern' '(' pattern=STRING ')'
+;
+
+EnumConstraint:
+    'enum' '(' values*=STRING[','] ')'
+;
+
+PropertyConstraint:
+    RangeConstraint | LengthConstraint | PatternConstraint | EnumConstraint
+;
+
+PropertyConstraints:
+    constraints*=PropertyConstraint[',']
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+EntityProperty:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)? ('(' constraints=PropertyConstraints ')')?
+;
+
+BehaviorParam:
+    name=ID '=' value=PropertyValue
+;
+
+BehaviorParameters:
+    params*=BehaviorParam[',']
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'threshold' | 'manual' | 'scheduled'
+;
+
+EntityBehavior:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=BehaviorParameters ')')?
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])?
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('broker:' broker=[BrokerConfiguration])?
+        ('topic:' topic=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+        ('param:' param=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationMechanism:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('retain:' retain=BOOL)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=HeaderList)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+BrokerConfiguration:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+TriggerCondition:
+    'equals' '(' value=PropertyValue ')' |
+    'not_equals' '(' value=PropertyValue ')' |
+    'greater_than' '(' value=NUMBER ')' |
+    'less_than' '(' value=NUMBER ')' |
+    'contains' '(' value=STRING ')' |
+    'changed'
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'event' '(' event_source=STRING ',' event_type=STRING ')'
+;
+
+PropertyTrigger:
+    'property' '(' entity=[EntityDefinition] ',' property=ID ',' condition=TriggerCondition ')'
+;
+
+ManualTrigger:
+    'manual'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | PropertyTrigger | ManualTrigger
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'async' | 'sync'
+;
+
+BackoffStrategy:
+    'linear' | 'exponential' | 'fixed'
+;
+
+FailureAction:
+    'stop' | 'continue' | 'rollback' | 'alert'
+;
+
+RetryPolicy:
+    'RetryPolicy'
+    (
+        ('max_attempts:' max_attempts=INT)
+        ('backoff:' backoff=BackoffStrategy)
+        ('on_failure:' on_failure=FailureAction)
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry=RetryPolicy)?
+        ('timeout:' timeout=INT)?
+        ('delay:' delay=INT)?
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[ConditionSpecification]['-'])?
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('execution:' execution=ExecutionControl)?
+        ('priority:' priority=INT)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+PropertyReference:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+FunctionCall:
+    function_name=ID '(' arguments*=ExpressionOperand[','] ')'
+;
+
+ExpressionOperand:
+    PropertyReference | LiteralValue | FunctionCall
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches' | 'in'
+;
+
+ComparisonExpression:
+    left=ExpressionOperand operator=ComparisonOperator right=ExpressionOperand
+;
+
+LogicalOperator:
+    'and' | 'or' | 'xor'
+;
+
+NotExpression:
+    'not' '(' expression=LogicalExpression ')'
+;
+
+LogicalTerm:
+    ComparisonExpression | '(' expression=LogicalExpression ')' | NotExpression
+;
+
+LogicalExpression:
+    left=LogicalTerm (operator=LogicalOperator right=LogicalTerm)*
+;
+
+ConditionSpecification:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityTarget:
+    'entity' '(' entity=[EntityDefinition] (',' property=ID)? ')'
+;
+
+ServiceTarget:
+    'service' '(' service_url=STRING ',' method=HTTPMethod ')'
+;
+
+BrokerTarget:
+    'broker' '(' broker=[BrokerConfiguration] ',' topic=STRING ')'
+;
+
+ScriptTarget:
+    'script' '(' script_path=STRING ')'
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | BrokerTarget | ScriptTarget
+;
+
+ActionType:
+    'set_property' | 'send_message' | 'call_service' | 'execute_script' | 'notify' | 'log'
+;
+
+ActionParam:
+    name=ID ':' value=PropertyValue
+;
+
+ActionParameters:
+    '{' params*=ActionParam[','] '}'
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' parameters=ActionParameters)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

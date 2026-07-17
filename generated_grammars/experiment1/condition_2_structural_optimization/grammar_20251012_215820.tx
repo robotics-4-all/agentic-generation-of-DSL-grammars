@@ -1,0 +1,313 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+SystemMetadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('clean_session:' clean_session=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('vhost:' vhost=STRING)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('url:' url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=HeadersSpec)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeadersSpec:
+    '{' items*=HeaderItem[','] '}'
+;
+
+HeaderItem:
+    key=STRING ':' value=STRING
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth | ApiKeyAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'auth' 'apikey' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+        ('query_param:' query_param=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    SensorEntity | ActuatorEntity | DeviceEntity | ServiceEntity
+;
+
+SensorEntity:
+    'entity' 'sensor' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' properties*=PropertyDefinition)*
+        ('behaviors:' behaviors*=BehaviorDefinition)*
+        ('broker:' broker=[BrokerConfig])
+        ('data_format:' data_format=DataFormat)?
+        ('update_interval:' update_interval=INT)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'entity' 'actuator' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' properties*=PropertyDefinition)*
+        ('behaviors:' behaviors*=BehaviorDefinition)*
+        ('broker:' broker=[BrokerConfig])
+        ('commands:' commands*=CommandDefinition)*
+    )#
+    'end'
+;
+
+DeviceEntity:
+    'entity' 'device' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('location:' location=STRING)?
+        ('properties:' properties*=PropertyDefinition)*
+        ('behaviors:' behaviors*=BehaviorDefinition)*
+        ('broker:' broker=[BrokerConfig])
+        ('capabilities:' capabilities*=STRING[','])?
+    )#
+    'end'
+;
+
+ServiceEntity:
+    'entity' 'service' name=ID
+    (
+        ('type:' entity_type=STRING)
+        ('endpoint:' endpoint=STRING)
+        ('properties:' properties*=PropertyDefinition)*
+        ('behaviors:' behaviors*=BehaviorDefinition)*
+        ('broker:' broker=[BrokerConfig])
+        ('operations:' operations*=OperationDefinition)*
+    )#
+    'end'
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDefinition:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+BehaviorType:
+    'reactive' | 'proactive' | 'adaptive' | 'scheduled'
+;
+
+CommandDefinition:
+    name=ID ':' command_type=STRING ('(' parameters*=ParameterDefinition[','] ')')?
+;
+
+OperationDefinition:
+    name=ID ':' operation_type=STRING ('(' parameters*=ParameterDefinition[','] ')')?
+;
+
+ParameterDefinition:
+    name=ID ':' data_type=DataType
+;
+
+DataFormat:
+    'json' | 'xml' | 'binary' | 'text' | 'csv'
+;
+
+AutomationDeclaration:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerSpec)
+        ('conditions:' conditions*=ConditionSpec)*
+        ('actions:' actions*=ActionSpec)*
+        ('execution:' execution=ExecutionControl)?
+        ('priority:' priority=INT)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+TriggerSpec:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'event' entity=[EntityDefinition] '.' event_name=ID
+;
+
+TimeTrigger:
+    'time' time_expression=TimeExpression
+;
+
+StateTrigger:
+    'state' entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeExpression:
+    CronExpression | IntervalExpression | AbsoluteTime
+;
+
+CronExpression:
+    'cron' expression=STRING
+;
+
+IntervalExpression:
+    'every' value=INT unit=TimeUnit
+;
+
+AbsoluteTime:
+    'at' time=STRING
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+ConditionSpec:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+SimpleCondition:
+    entity=[EntityDefinition] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionSpec:
+    EntityAction | ServiceAction | NotificationAction | DelayAction
+;
+
+EntityAction:
+    'action' 'entity' target=[EntityDefinition] '.' command=ID ('(' arguments*=ActionArgument[','] ')')?
+;
+
+ServiceAction:
+    'action' 'service' service_name=ID '.' operation=ID ('(' arguments*=ActionArgument[','] ')')?
+;
+
+NotificationAction:
+    'action' 'notify' message=STRING ('to' recipients*=STRING[','])?
+;
+
+DelayAction:
+    'action' 'delay' duration=INT unit=TimeUnit
+;
+
+ActionArgument:
+    name=ID '=' value=PropertyValue
+;
+
+ExecutionControl:
+    'execution'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+        ('async:' async=BOOL)?
+    )#
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;

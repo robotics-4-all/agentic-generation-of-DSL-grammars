@@ -1,0 +1,182 @@
+WAVE 3: Complex Sample Model Generation (Peak Layer)
+====================================================
+
+Task:
+You are an expert in Domain-Specific Languages (DSLs) and textX grammar. Your task is to generate COMPLEX, COMPREHENSIVE sample models that integrate MOST or ALL requirements together to create complete, real-world system models.
+
+This is WAVE 3 of a pyramid generation process - the final layer that demonstrates full system integration and maximum complexity.
+
+EXAMPLE: Calculator DSL Wave 3
+================================
+
+Example Requirements:
+R1 - The grammar should support variable declarations with numeric types.
+R2 - The grammar should support basic arithmetic operations (add, subtract, multiply, divide).
+R3 - The grammar should support function definitions with parameters.
+R4 - The grammar should support conditional expressions (if-then-else).
+R5 - The grammar should support loops with iteration control.
+R6 - The grammar should support comments for documentation.
+
+Example Grammar:
+```
+Program: statements*=Statement;
+
+Statement:
+    VariableDeclaration | Assignment | FunctionDef | IfStatement | Loop | Expression
+;
+
+VariableDeclaration:
+    'var' name=ID ':' type=Type '=' value=Expression
+;
+
+Type: 'int' | 'float';
+
+Assignment:
+    name=ID '=' value=Expression
+;
+
+FunctionDef:
+    'function' name=ID '(' params*=Parameter[','] ')' ':' type=Type
+    'begin'
+        body*=Statement
+    'end'
+;
+
+Parameter: name=ID ':' type=Type;
+
+IfStatement:
+    'if' condition=Expression 'then'
+        then_body*=Statement
+    ('else'
+        else_body*=Statement)?
+    'endif'
+;
+
+Loop:
+    'for' var=ID 'in' start=Expression 'to' end=Expression
+        body*=Statement
+    'endfor'
+;
+
+Expression: Arithmetic | ID | NUMBER;
+Arithmetic: left=Operand op=Operator right=Operand;
+Operand: NUMBER | ID;
+Operator: '+' | '-' | '*' | '/';
+Comment: /\/\/.*$/;
+```
+
+Previous Wave Models (for reference):
+```
+--- Wave 1 Models (simple, one requirement each) ---
+var x : int = 10
+---
+var result : int = 5 + 3
+
+--- Wave 2 Models (medium, 2-3 requirements combined) ---
+var x : int = 10
+var sum : int = x + 5
+if sum then
+    var result : int = sum * 2
+endif
+```
+
+Example Wave 3 Model (FULL SYSTEM - All requirements R1-R6):
+
+Model 1 (Complete Data Processing System):
+```
+var dataset : int = 100
+var threshold : int = 50
+var result : int = 0
+
+function processArray : int
+begin
+    var sum : int = 0
+    var count : int = 0
+    
+    for i in 1 to dataset
+        var current : int = i * 2
+        if current then
+            sum = sum + current
+            count = count + 1
+        endif
+    endfor
+    
+    var average : int = sum / count
+end
+
+function validateData : int
+begin
+    if threshold then
+        var validated : int = threshold + 10
+    else
+        var validated : int = 0
+    endif
+end
+
+result = 42
+```
+
+Notice: Wave 3 models are comprehensive, realistic, and use most/all grammar features together.
+
+========================
+END OF EXAMPLE
+========================
+
+YOUR TASK:
+==========
+
+The grammar you need to generate sample models for was created to satisfy the following requirements:
+{{REQUIREMENTS}}
+
+Here is the generated textX grammar:
+```
+{{GRAMMAR}}
+```
+
+Here are the VALID models from previous waves that demonstrate valid patterns:
+{{PREVIOUS_VALID_MODELS}}
+
+Your goal is to generate EXACTLY {{NUM_MODELS}} complex, comprehensive sample models where:
+
+1. **INTEGRATE MOST/ALL requirements** - Each model should use as many requirements as realistically possible
+2. **Real-world scenarios** - Create complete, realistic system models (e.g., smart home, IoT system, automation)
+3. **Maximum complexity** - Use deep nesting, multiple components, comprehensive feature usage
+4. **Learn from previous waves** - Use the valid patterns from Wave 1 and Wave 2 models
+5. **Syntactically valid** - Must parse correctly with the textX grammar
+6. **Self-contained** - Each model should be a complete, parseable system
+7. **Diverse scenarios** - Each of the {{NUM_MODELS}} models should represent a different use case
+
+Think of these as "end-to-end system tests" - complete applications that demonstrate the full power of the DSL.
+
+Scenario Suggestions (adapt to your grammar domain):
+- Complete smart home automation system
+- IoT sensor network with data processing
+- Industrial control system
+- Healthcare monitoring system
+- Smart building management
+- Environmental monitoring system
+
+Guidelines:
+- Generate {{NUM_MODELS}} models
+- Each model should integrate most/all requirements (R1-R8 if possible)
+- Create realistic, complete system models
+- Use complex interactions and deep nesting
+- Learn from valid patterns in previous waves
+- Ensure syntactic correctness
+- Make each model represent a different real-world scenario
+
+CRITICAL: Return models in the following format:
+- Each model separated by a line containing exactly: --- MODEL_SEPARATOR ---
+- NO markdown formatting (no ```, no code blocks)
+- NO explanations between models
+- NO comments about which requirements each model uses
+- ONLY the model content that can be directly parsed by textX
+
+Example output format:
+<complete smart home system model>
+--- MODEL_SEPARATOR ---
+<complete IoT industrial system model>
+--- MODEL_SEPARATOR ---
+<complete healthcare monitoring model>
+
+Start generating the {{NUM_MODELS}} Wave 3 complex sample models now:

@@ -1,0 +1,226 @@
+SmartEnvironmentModel:
+    (
+        ('metadata' metadata=Metadata)
+        ('broker' broker=Broker)
+        ('auth' authentication=Authentication)
+        ('entities' entities*=Entity)
+        ('automations' automations*=Automation)
+        ('conditions' conditions*=Condition)
+        ('actions' actions*=Action)
+    )#
+;
+
+Metadata:
+    'name' ':' name=STRING
+    'version' ':' version=STRING
+    ('description' ':' description=STRING)?
+    ('author' ':' author=STRING)?
+    ('timestamp' ':' timestamp=STRING)?
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'MQTT'
+    'host' ':' host=STRING
+    'port' ':' port=INT
+    ('client_id' ':' client_id=STRING)?
+    ('keepalive' ':' keepalive=INT)?
+    ('qos' ':' qos=INT)?
+    'end'
+;
+
+AMQPBroker:
+    'AMQP'
+    'host' ':' host=STRING
+    'port' ':' port=INT
+    ('vhost' ':' vhost=STRING)?
+    ('exchange' ':' exchange=STRING)?
+    ('routing_key' ':' routing_key=STRING)?
+    'end'
+;
+
+HTTPBroker:
+    'HTTP'
+    'base_url' ':' base_url=STRING
+    ('port' ':' port=INT)?
+    ('timeout' ':' timeout=INT)?
+    ('headers' ':' headers*=HeaderPair)?
+    'end'
+;
+
+HeaderPair:
+    key=STRING ':' value=STRING
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'BasicAuth'
+    'username' ':' username=STRING
+    'password' ':' password=STRING
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth'
+    'token' ':' token=STRING
+    ('token_type' ':' token_type=STRING)?
+    'end'
+;
+
+CertificateAuth:
+    'CertificateAuth'
+    'cert_path' ':' cert_path=STRING
+    'key_path' ':' key_path=STRING
+    ('ca_path' ':' ca_path=STRING)?
+    'end'
+;
+
+APIKeyAuth:
+    'APIKeyAuth'
+    'api_key' ':' api_key=STRING
+    ('header_name' ':' header_name=STRING)?
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    'type' ':' entity_type=EntityType
+    ('topic' ':' topic=STRING)?
+    ('properties' ':' properties*=Property)?
+    ('behaviors' ':' behaviors*=Behavior)?
+    ('state' ':' state=EntityState)?
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'gateway' | 'controller' | 'virtual'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'integer' | 'float' | 'boolean' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL | Array | Object
+;
+
+Array:
+    '[' values*=PropertyValue[','] ']'
+;
+
+Object:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+Behavior:
+    'on' trigger=BehaviorTrigger 'do' action_ref=[Action]
+;
+
+BehaviorTrigger:
+    'change' | 'update' | 'connect' | 'disconnect' | 'error'
+;
+
+EntityState:
+    'online' | 'offline' | 'error' | 'maintenance' | 'unknown'
+;
+
+Automation:
+    'Automation' name=ID
+    'trigger' ':' trigger=AutomationTrigger
+    'condition' ':' condition_ref=[Condition]
+    'action' ':' action_ref=[Action]
+    ('enabled' ':' enabled=BOOL)?
+    ('priority' ':' priority=INT)?
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'TimeEvent'
+    ('cron' ':' cron_expression=STRING)?
+    ('interval' ':' interval=INT)?
+    ('at' ':' time=STRING)?
+    'end'
+;
+
+EventTrigger:
+    'EventTrigger'
+    'entity' ':' entity_ref=[Entity]
+    'event' ':' event_type=STRING
+    ('data' ':' data=PropertyValue)?
+    'end'
+;
+
+StateTrigger:
+    'StateTrigger'
+    'entity' ':' entity_ref=[Entity]
+    'property' ':' property_name=STRING
+    'operator' ':' operator=ComparisonOperator
+    'value' ':' value=PropertyValue
+    'end'
+;
+
+ComparisonOperator:
+    'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal' | 'contains'
+;
+
+Condition:
+    'Condition' name=ID
+    'expression' ':' expression=LogicalExpression
+    'end'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=LogicalExpression)?
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonExpression:
+    '(' expression=LogicalExpression ')' |
+    SimpleComparison
+;
+
+SimpleComparison:
+    'entity' ':' entity_ref=[Entity]
+    'property' ':' property_name=STRING
+    'operator' ':' operator=ComparisonOperator
+    'value' ':' value=PropertyValue
+;
+
+Action:
+    'Action' name=ID
+    'type' ':' action_type=ActionType
+    ('parameters' ':' parameters*=ActionParameter)?
+    ('retry_count' ':' retry_count=INT)?
+    ('timeout' ':' timeout=INT)?
+    'end'
+;
+
+ActionType:
+    'device_control' | 'notification' | 'data_collection' | 'system_command' | 'script_execution'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;

@@ -1,0 +1,133 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        broker=BrokerConfiguration?
+        authentication=Authentication?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfiguration:
+    'broker'
+    (
+        ('type:' brokerType=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'mqtt' | 'amqp' | 'redis'
+;
+
+Authentication:
+    'authentication'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+        ('apiKey:' apiKey=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service'
+;
+
+Property:
+    name=ID ':' dataType=PropertyDataType ('=' defaultValue=PropertyValue)?
+;
+
+PropertyDataType:
+    'str' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+BehaviorAction:
+    'notify' | 'trigger' | 'respond' | 'monitor'
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    'time' | 'event' | 'state_change' | 'manual'
+;
+
+Condition:
+    operand1=ConditionOperand operator=ConditionOperator operand2=ConditionOperand
+;
+
+ConditionOperand:
+    EntityReference | LiteralValue
+;
+
+EntityReference:
+    entity=[Entity] ('.' property=ID)?
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ConditionOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+Action:
+    target=ActionTarget operation=ActionOperation value=ActionValue?
+;
+
+ActionTarget:
+    entity=[Entity] ('.' property=ID)?
+;
+
+ActionOperation:
+    'set' | 'toggle' | 'increment' | 'decrement' | 'notify' | 'execute'
+;
+
+ActionValue:
+    STRING | FLOAT | INT | BOOL | EntityReference
+;

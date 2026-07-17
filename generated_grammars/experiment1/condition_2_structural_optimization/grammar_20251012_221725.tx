@@ -1,0 +1,303 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDeclaration
+        entities*=EntityDeclaration
+        automations*=AutomationDeclaration
+        conditions*=ConditionDeclaration
+        actions*=ActionDeclaration
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'basic' '(' 'username:' username=STRING ',' 'password:' password=STRING ')'
+;
+
+TokenAuth:
+    'token' '(' 'value:' token=STRING ')'
+;
+
+CertAuth:
+    'cert' '(' 'path:' certPath=STRING (',' 'key:' keyPath=STRING)? ')'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'service'
+;
+
+DataType:
+    'int' | 'float' | 'str' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    key=STRING ':' value=PropertyValue
+;
+
+Constraint:
+    RangeConstraint | LengthConstraint | PatternConstraint
+;
+
+RangeConstraint:
+    'range:' min=FLOAT '-' max=FLOAT
+;
+
+LengthConstraint:
+    'length:' length=INT
+;
+
+PatternConstraint:
+    'pattern:' pattern=STRING
+;
+
+PropertyConstraints:
+    constraints*=Constraint[',']
+;
+
+PropertyDeclaration:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)? ('(' constraints=PropertyConstraints ')')?
+;
+
+BehaviorType:
+    'periodic' | 'trigger' | 'response' | 'schedule' | 'event'
+;
+
+BehaviorParameter:
+    key=ID '=' value=PropertyValue
+;
+
+BehaviorParameters:
+    parameters*=BehaviorParameter[',']
+;
+
+BehaviorDeclaration:
+    name=ID ':' behavior=BehaviorType ('(' parameters=BehaviorParameters ')')?
+;
+
+BrokerDeclaration:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=Authentication)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+EntityDeclaration:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerDeclaration])
+        ('topic:' topic=STRING)?
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDeclaration['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDeclaration['-'])?
+        ('state:' state=STRING)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | FixedTimeSchedule
+;
+
+CronSchedule:
+    'cron:' expression=STRING
+;
+
+IntervalSchedule:
+    'interval:' interval=INT 'seconds'
+;
+
+FixedTimeSchedule:
+    'at:' time=STRING
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'event' '(' entity=[EntityDeclaration] ',' event=STRING ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[EntityDeclaration] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ExecutionControl:
+    'sequential' | 'parallel' | 'async' | 'sync'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+EntityCondition:
+    entity=[EntityDeclaration] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=STRING
+;
+
+ValueCondition:
+    left=PropertyValue operator=ComparisonOperator right=PropertyValue
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+ConditionTerm:
+    '(' expression=ConditionExpression ')' | SimpleCondition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionDeclaration:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[ConditionDeclaration]['-'])?
+        ('actions:' '-' actions*=[ActionDeclaration]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+ActionType:
+    'send' | 'set' | 'call' | 'notify' | 'execute' | 'wait' | 'log'
+;
+
+EntityTarget:
+    'entity:' entity=[EntityDeclaration] ('.' property=ID)?
+;
+
+ServiceTarget:
+    'service:' service=STRING
+;
+
+TopicTarget:
+    'topic:' topic=STRING (',' broker=[BrokerDeclaration])?
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | TopicTarget
+;
+
+ActionParameter:
+    key=ID ':' value=PropertyValue
+;
+
+FailureAction:
+    'retry' | 'ignore' | 'abort' | 'fallback'
+;
+
+ActionDeclaration:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=ActionTarget)?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('onFailure:' onFailure=FailureAction)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

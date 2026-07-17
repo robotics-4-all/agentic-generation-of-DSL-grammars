@@ -1,0 +1,317 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStm
+        (metadata=Metadata)?
+        (brokers*=BrokerDef)*
+        (authentication*=AuthenticationDef)*
+        (entities*=EntityDef)*
+        (automations*=AutomationDef)*
+        (conditions*=ConditionDef)*
+        (actions*=ActionDef)*
+    )#
+;
+
+ImportStm:
+    'import' grammar_to_import=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationDef])?
+    )#
+    'end'
+;
+
+AuthenticationDef:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerDef])
+        ('topic:' topic=STRING)
+        ('properties:' '{' properties*=PropertyDef[','] '}')?
+        ('behaviors:' '{' behaviors*=BehaviorDef[','] '}')?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+PropertyDef:
+    name=ID ':' property_type=PropertyType ('=' default_value=PropertyValue)?
+;
+
+PropertyType:
+    'string' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ObjectValue | ArrayValue
+;
+
+ObjectValue:
+    '{' items*=ObjectItem[','] '}'
+;
+
+ObjectItem:
+    name=STRING ':' value=PropertyValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=BehaviorParameters ')')?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'threshold' | 'state_machine' | 'continuous'
+;
+
+BehaviorParameters:
+    '{' params*=ParameterDef[','] '}'
+;
+
+ParameterDef:
+    name=ID ':' value=PropertyValue
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=TriggerDef)
+        ('condition:' condition=[ConditionDef])?
+        ('actions:' '[' actions*=[ActionDef][','] ']')
+        ('execution:' execution=ExecutionControl)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TriggerDef:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'event' '(' entity=[EntityDef] ',' event_type=STRING ')'
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' value=INT ',' unit=TimeUnit ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry:' retry=RetryPolicy)?
+        ('timeout:' timeout=INT)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'async'
+;
+
+RetryPolicy:
+    'retry' '(' attempts=INT ',' delay=INT ')'
+;
+
+ConditionDef:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+    | '(' expression=LogicalExpression ')'
+    | negated='!' expression=LogicalExpression
+;
+
+ValueExpression:
+    EntityReference | LiteralValue | FunctionCall
+;
+
+EntityReference:
+    entity=[EntityDef] '.' property=ID
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+FunctionCall:
+    function_name=ID '(' arguments*=ValueExpression[','] ')'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'xor'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' parameters=ActionParameters)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'notify' | 'log' | 'execute_script' | 'call_service'
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | NotificationTarget
+;
+
+EntityTarget:
+    entity=[EntityDef] ('.' property=ID)?
+;
+
+ServiceTarget:
+    'service' '(' service_name=STRING ')'
+;
+
+NotificationTarget:
+    'notification' '(' channel=STRING ')'
+;
+
+ActionParameters:
+    '{' params*=ActionParameter[','] '}'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

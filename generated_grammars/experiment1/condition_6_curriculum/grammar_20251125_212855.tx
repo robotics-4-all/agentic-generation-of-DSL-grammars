@@ -1,0 +1,178 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        broker=BrokerConfig?
+        auth=AuthConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)?
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    'broker'
+    (
+        ('type:' type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'mqtt' | 'amqp' | 'redis' | 'kafka'
+;
+
+AuthConfig:
+    'auth'
+    (
+        ('type:' type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('cert:' cert=STRING)?
+    )#
+    'end'
+;
+
+AuthType:
+    'basic' | 'token' | 'cert' | 'oauth'
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+Property:
+    name=ID ':' dtype=DataType ('=' default=PropertyValue)?
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Capability:
+    name=ID '(' params*=CapabilityParam[','] ')'
+;
+
+CapabilityParam:
+    name=ID ':' dtype=DataType
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=Action['-'])
+    )#
+    'end'
+;
+
+Trigger:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+TimeTrigger:
+    'time' '(' time=TimeSpec ')'
+;
+
+TimeSpec:
+    hour=INT ':' minute=INT | 'sunrise' | 'sunset' | 'every' interval=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+StateTrigger:
+    'state' '(' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+EventTrigger:
+    'event' '(' event=STRING ')'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionGroup:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+Condition:
+    '(' group=ConditionGroup ')' | SimpleCondition
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or'
+;
+
+Action:
+    SetAction | CallAction | NotifyAction | DelayAction
+;
+
+SetAction:
+    'set' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+CallAction:
+    'call' entity=[Entity] '.' capability=ID '(' params*=ActionParam[','] ')'
+;
+
+ActionParam:
+    name=ID '=' value=PropertyValue
+;
+
+NotifyAction:
+    'notify' message=STRING ('to:' target=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

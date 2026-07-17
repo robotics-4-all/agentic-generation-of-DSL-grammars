@@ -1,0 +1,296 @@
+SmartHomeModel:
+    (
+        imports_or_references*=ImportOrReferenceStm
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportOrReferenceStm:
+    ImportStm | ReferenceStm
+;
+
+ImportStm:
+    'import' grammar_to_import=STRING
+;
+
+ReferenceStm:
+    'reference' language_name=ID ('as' language_alias=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | HTTPBroker | WebSocketBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+WebSocketBroker:
+    'Broker<WebSocket>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+    )#
+    'end'
+;
+
+EntityDef:
+    SensorEntity | ActuatorEntity | HybridEntity
+;
+
+SensorEntity:
+    'Entity<Sensor>' name=ID
+    (
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Entity<Actuator>' name=ID
+    (
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('commands:' '-' commands*=CommandDef['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+HybridEntity:
+    'Entity<Hybrid>' name=ID
+    (
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('commands:' '-' commands*=CommandDef['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+PropertyDef:
+    name=ID ':' type=PropertyType ('=' default=PropertyValue)?
+;
+
+PropertyType:
+    'int' | 'float' | 'string' | 'bool' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'on_demand'
+;
+
+CommandDef:
+    name=ID ':' command_type=CommandType
+;
+
+CommandType:
+    'toggle' | 'set_value' | 'trigger'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' conditions=ConditionGroup)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('execution:' execution=ExecutionControl)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionGroup:
+    conditions+=PrimitiveCondition (operator=LogicalOperator conditions+=PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    '(' group=ConditionGroup ')' |
+    TimeCondition |
+    EntityCondition |
+    StateCondition |
+    ValueCondition
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+EntityCondition:
+    'entity' entity=[EntityDef] operator=ComparisonOperator state=STRING
+;
+
+StateCondition:
+    'state' entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ValueCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeValue:
+    TIME | DATE | STRING
+;
+
+TIME:
+    /([01]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/
+;
+
+DATE:
+    /\d{4}-\d{2}-\d{2}/
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'is' | 'is_not'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | ScriptAction | DelayAction
+;
+
+EntityAction:
+    'entity_action' entity=[EntityDef] command=ID ('(' parameters=ParameterList ')')?
+;
+
+NotificationAction:
+    'notification' message=STRING ('to:' target=STRING)?
+;
+
+ScriptAction:
+    'script' script_path=STRING ('(' parameters=ParameterList ')')?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ParameterList:
+    parameters+=Parameter[',']
+;
+
+Parameter:
+    name=ID '=' value=PropertyValue
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('max_runs:' max_runs=INT)?
+        ('timeout:' timeout=INT)?
+        ('retry_count:' retry_count=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'once' | 'repeat' | 'parallel' | 'sequential'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

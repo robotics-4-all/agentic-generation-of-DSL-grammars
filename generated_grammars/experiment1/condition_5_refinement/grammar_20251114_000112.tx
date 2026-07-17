@@ -1,0 +1,207 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=BrokerDef
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportStm:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+AuthDef:
+    PlainAuth | ApiKeyAuth | CertAuth
+;
+
+PlainAuth:
+    'Plain' '(' 'username:' username=STRING ',' 'password:' password=STRING ')'
+;
+
+ApiKeyAuth:
+    'ApiKey' '(' 'key:' key=STRING ')'
+;
+
+CertAuth:
+    'Cert' '(' 'cert:' cert=STRING ')'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthDef)?
+        ('basePath:' basePath=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthDef)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthDef)?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'timestamp' | 'json'
+;
+
+JsonValue:
+    '{' items*=JsonItem[','] '}'
+;
+
+JsonItem:
+    key=STRING ':' value=ValueExpr
+;
+
+ValueExpr:
+    STRING | FLOAT | INT | BOOL | JsonValue
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=ValueExpr)?
+;
+
+PublishAction:
+    'publish' '(' topic=STRING ',' message=ValueExpr ')'
+;
+
+CallAction:
+    'call' '(' service=STRING ',' params=ValueExpr? ')'
+;
+
+SetAction:
+    'set' '(' property=ID ',' value=ValueExpr ')'
+;
+
+ActionExpr:
+    PublishAction | CallAction | SetAction
+;
+
+BehaviorDef:
+    name=ID ':' action=ActionExpr
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=STRING)?
+    )#
+    'end'
+;
+
+TimeTrigger:
+    'time' '(' schedule=STRING ')'
+;
+
+EventTrigger:
+    'event' '(' entity=ID ',' eventType=STRING ')'
+;
+
+PropertyTrigger:
+    'property' '(' entity=ID '.' property=ID ',' condition=ComparisonExpr ')'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | PropertyTrigger
+;
+
+PropertyRef:
+    entity=ID '.' property=ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonExpr:
+    left=PropertyRef operator=ComparisonOperator right=ValueExpr
+;
+
+LogicalExpr:
+    left=ComparisonExpr (operator=LogicalOperator right=ComparisonExpr)*
+;
+
+ConditionExpr:
+    'condition' condition=LogicalExpr
+;
+
+EntityAction:
+    'action' target=ID '.' behavior=ID '(' params=ValueExpr? ')'
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' channel=STRING)? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions=ConditionExpr)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

@@ -1,0 +1,345 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (auth_mechanisms*=Authentication)
+        (entities*=Entity)
+        (automations*=Automation)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('client_id:' client_id=STRING)?
+        ('keep_alive:' keep_alive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('password:' password=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+TokenType:
+    'Bearer' | 'API' | 'JWT'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('data_type:' data_type=DataType)
+        ('unit:' unit=STRING)?
+        ('range:' range=Range)?
+        ('readonly:' readonly=BOOL)?
+        ('default:' default_value=PropertyValue)?
+    )#
+    'end'
+;
+
+PropertyChange:
+    'PropertyChange'
+    (
+        ('property:' property=[Property])
+        ('condition:' condition=Condition)
+    )#
+;
+
+TimeEvent:
+    'TimeEvent'
+    (
+        ('schedule:' schedule=STRING)
+        ('repeat:' repeat=BOOL)?
+    )#
+;
+
+ExternalEvent:
+    'ExternalEvent'
+    (
+        ('source:' source=STRING)
+        ('event_type:' event_type=STRING)
+        ('condition:' condition=Condition)?
+    )#
+;
+
+TriggerEvent:
+    PropertyChange | TimeEvent | ExternalEvent
+;
+
+SetPropertyAction:
+    'SetProperty'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=[Property])
+        ('value:' value=PropertyValue)
+    )#
+;
+
+SendMessageAction:
+    'SendMessage'
+    (
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('message:' message=STRING)
+    )#
+;
+
+CallServiceAction:
+    'CallService'
+    (
+        ('service_url:' service_url=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' headers=Headers)?
+        ('body:' body=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+;
+
+ActionDefinition:
+    SetPropertyAction | SendMessageAction | CallServiceAction
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('action:' action=ActionDefinition)
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+ComparisonCondition:
+    left=ConditionValue operator=ComparisonOperator right=ConditionValue
+;
+
+TimeCondition:
+    'TimeCondition'
+    (
+        ('start_time:' start_time=STRING)?
+        ('end_time:' end_time=STRING)?
+        ('days:' days=DayList)?
+    )#
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | '(' condition=Condition ')'
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+DelayAction:
+    'Delay'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+Action:
+    SetPropertyAction | SendMessageAction | CallServiceAction | DelayAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' '-' conditions*=Condition['-'])
+        ('actions:' '-' actions*=Action['-'])
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=[Property]
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ConditionValue:
+    PropertyReference | LiteralValue
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours'
+;
+
+HeaderItem:
+    name=STRING ':' value=STRING
+;
+
+Headers:
+    '{' items*=HeaderItem[','] '}'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+Range:
+    'Range' '(' min=FLOAT ',' max=FLOAT ')'
+;
+
+JSONItem:
+    name=STRING ':' value=JSONValue
+;
+
+JSONObject:
+    '{' items*=JSONItem[','] '}'
+;
+
+JSONArray:
+    '[' items*=JSONValue[','] ']'
+;
+
+JSONValue:
+    STRING | FLOAT | INT | BOOL | JSONObject | JSONArray
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | JSONObject
+;
+
+DayName:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+DayList:
+    '[' days*=DayName[','] ']'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

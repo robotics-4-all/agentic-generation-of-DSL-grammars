@@ -1,0 +1,259 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=BrokerDefinition)*
+    (authentications*=AuthenticationDefinition)*
+    (entities*=EntityDefinition)*
+    (automations*=AutomationDefinition)*
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerDefinition:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topics:' '-' topics*=STRING['-'])?
+        ('qos:' qos=INT)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationDefinition])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('queue:' queue=STRING)?
+        ('auth:' auth=[AuthenticationDefinition])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'broker' 'http' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)?
+        ('method:' method=HTTPMethod)?
+        ('auth:' auth=[AuthenticationDefinition])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+AuthenticationDefinition:
+    BasicAuth | TokenAuth | CertificateAuth | APIKeyAuth
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'auth' 'certificate' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'auth' 'apikey' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+        ('location:' location=APIKeyLocation)?
+    )#
+    'end'
+;
+
+APIKeyLocation:
+    'header' | 'query' | 'body'
+;
+
+EntityDefinition:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerDefinition])
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'integer' | 'float' | 'boolean' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+BehaviorDefinition:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=BehaviorParameters ')')?
+;
+
+BehaviorType:
+    'read' | 'write' | 'notify' | 'execute' | 'subscribe' | 'publish'
+;
+
+BehaviorParameters:
+    parameters*=ParameterDefinition[',']
+;
+
+ParameterDefinition:
+    name=ID ':' param_type=DataType
+;
+
+AutomationDefinition:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDefinition)
+        ('conditions:' '-' conditions*=ConditionDefinition['-'])?
+        ('actions:' '-' actions*=ActionDefinition['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+TriggerDefinition:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'event' entity=[EntityDefinition] property=ID operator=TriggerOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+StateTrigger:
+    'state' entity=[EntityDefinition] state=STRING
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | FixedTimeSchedule
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'interval' duration=INT unit=TimeUnit
+;
+
+FixedTimeSchedule:
+    'at' time=STRING
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TriggerOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ConditionDefinition:
+    SimpleCondition | CompoundCondition
+;
+
+SimpleCondition:
+    entity=[EntityDefinition] property=ID operator=ConditionOperator value=PropertyValue
+;
+
+CompoundCondition:
+    left=ConditionDefinition logical_operator=LogicalOperator right=ConditionDefinition
+;
+
+ConditionOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not_in' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionDefinition:
+    EntityAction | NotificationAction | ServiceAction | DelayAction
+;
+
+EntityAction:
+    'set' entity=[EntityDefinition] property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' recipients*=STRING[','])?
+;
+
+ServiceAction:
+    'call' service=STRING ('with' parameters=ActionParameters)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ActionParameters:
+    '{' parameters*=ActionParameter[','] '}'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;

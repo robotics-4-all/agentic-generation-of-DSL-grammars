@@ -1,0 +1,275 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth_configs*=AuthConfig
+        entities*=Entity
+        actions*=Action
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'virtual'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+EventType:
+    'connect' | 'disconnect' | 'message' | 'error' | 'timeout'
+;
+
+EntityState:
+    'online' | 'offline' | 'active' | 'inactive' | 'error'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>=' | '<=' | '>' | '<'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT | 'now' | 'sunrise' | 'sunset'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    ('Broker<Redis>' | 'Broker<REDIS>') name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+ActionRef:
+    action=[Action]
+;
+
+Behavior:
+    'on' event=EventType 'do' action=ActionRef
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'every' interval=INT unit=TimeUnit
+;
+
+AtTimeSchedule:
+    time=TimeValue
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | AtTimeSchedule
+;
+
+EventTrigger:
+    'event' entity=[Entity] 'on' event=EventType
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+PropertyTrigger:
+    'property' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+Trigger:
+    EventTrigger | TimeTrigger | PropertyTrigger
+;
+
+PropertyCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+EntityCondition:
+    entity=[Entity] 'is' state=EntityState
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=TimeValue
+;
+
+GroupCondition:
+    '(' condition=ConditionGroup ')'
+;
+
+Condition:
+    PropertyCondition | EntityCondition | TimeCondition | GroupCondition
+;
+
+ConditionGroup:
+    first=Condition (operator=LogicalOperator rest*=Condition)*
+;
+
+PropertyAction:
+    'SetProperty' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+    )#
+    'end'
+;
+
+MessageAction:
+    'SendMessage' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('topic:' topic=STRING)
+        ('payload:' payload=STRING)
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+ServiceAction:
+    'CallService' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('service:' service=STRING)
+        ('parameters:' parameters=STRING)?
+    )#
+    'end'
+;
+
+DelayAction:
+    'Delay' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+Action:
+    PropertyAction | MessageAction | ServiceAction | DelayAction
+;
+
+ActionReference:
+    action=[Action]
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=ActionReference['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+Comment: CommentLine | CommentBlock;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;

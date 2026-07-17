@@ -1,0 +1,226 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication=Authentication?
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+AuthMethod:
+    'basic' | 'token' | 'certificate' | 'oauth2' | 'apikey'
+;
+
+BasicCredentials:
+    'username:' username=STRING 'password:' password=STRING
+;
+
+TokenCredentials:
+    'token:' token=STRING ('expiry:' expiry=STRING)?
+;
+
+CertCredentials:
+    'certPath:' certPath=STRING ('keyPath:' keyPath=STRING)?
+;
+
+ApiKeyCredentials:
+    'key:' key=STRING ('header:' header=STRING)?
+;
+
+Credentials:
+    BasicCredentials | TokenCredentials | CertCredentials | ApiKeyCredentials
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('baseTopic:' baseTopic=STRING)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'service'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary' | 'timestamp'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)? ('readonly:' readonly=BOOL)?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'threshold_based' | 'manual' | 'scheduled'
+;
+
+Behavior:
+    name=ID ':' behaviorType=BehaviorType ('config:' config=STRING)?
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'event:' entity=[Entity] 'property:' property=ID
+;
+
+ScheduleTrigger:
+    'schedule:' schedule=STRING
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startsWith' | 'endsWith'
+;
+
+ThresholdTrigger:
+    'threshold:' entity=[Entity] 'property:' property=ID 'operator:' operator=ComparisonOperator 'value:' value=PropertyValue
+;
+
+ManualTrigger:
+    'manual'
+;
+
+Trigger:
+    EventTrigger | ScheduleTrigger | ThresholdTrigger | ManualTrigger
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+ConditionRef:
+    ref=[Condition]
+;
+
+ActionRef:
+    ref=[Action] ('delay:' delay=INT)?
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=ConditionRef['-'])?
+        ('actions:' '-' actions*=ActionRef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionTerm:
+    SimpleCondition | '(' expression=ConditionExpression ')'
+;
+
+LogicalOperator:
+    '&&' | '||' | '!'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActionType:
+    'setValue' | 'sendMessage' | 'executeScript' | 'callService' | 'notify' | 'delay'
+;
+
+ActionParameter:
+    name=ID '=' value=PropertyValue
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=[Entity])
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

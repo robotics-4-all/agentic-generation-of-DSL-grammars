@@ -1,0 +1,236 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth=AuthenticationConfig?
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('clientId:' clientId=STRING)?
+        ('keepAlive:' keepAlive=INT)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=AuthCredentials)
+    )#
+    'end'
+;
+
+AuthMethod:
+    'basic' | 'token' | 'oauth2' | 'certificate'
+;
+
+AuthCredentials:
+    BasicAuth | TokenAuth | OAuth2Auth | CertAuth
+;
+
+BasicAuth:
+    'Basic' '(' username=STRING ',' password=STRING ')'
+;
+
+TokenAuth:
+    'Token' '(' token=STRING ')'
+;
+
+OAuth2Auth:
+    'OAuth2' '(' clientId=STRING ',' clientSecret=STRING ',' scope=STRING? ')'
+;
+
+CertAuth:
+    'Certificate' '(' certPath=STRING ',' keyPath=STRING ')'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'speaker' | 'display' | 'other'
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'int' | 'float' | 'str' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+BehaviorDef:
+    name=ID ':' actionType=ActionType ('(' parameters*=ParameterDef[','] ')')?
+;
+
+ActionType:
+    'turn_on' | 'turn_off' | 'set_value' | 'get_value' | 'toggle' | 'dim' | 'brighten' | 'custom'
+;
+
+ParameterDef:
+    name=ID ':' dataType=DataType
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions*=ConditionDef)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TriggerDef:
+    TimeTrigger | StateTrigger | EventTrigger
+;
+
+TimeTrigger:
+    'Time' '(' time=TimeSpec ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDef] ',' property=ID ',' value=PropertyValue ')'
+;
+
+EventTrigger:
+    'Event' '(' eventType=STRING (',' parameters*=EventParam[','])? ')'
+;
+
+TimeSpec:
+    CronSpec | IntervalSpec | AtSpec
+;
+
+CronSpec:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSpec:
+    'interval' '(' seconds=INT ')'
+;
+
+AtSpec:
+    'at' '(' time=STRING ')'
+;
+
+EventParam:
+    name=ID '=' value=PropertyValue
+;
+
+ConditionDef:
+    left=SimpleCondition (logicalOp=LogicalOperator right=SimpleCondition)*
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or'
+;
+
+ActionDef:
+    EntityAction | ServiceAction | DelayAction | NotificationAction
+;
+
+EntityAction:
+    'EntityAction' '(' entity=[EntityDef] ',' behavior=ID (',' parameters*=ActionParam[','])? ')'
+;
+
+ServiceAction:
+    'ServiceAction' '(' service=STRING ',' method=STRING (',' parameters*=ActionParam[','])? ')'
+;
+
+DelayAction:
+    'Delay' '(' duration=INT ')'
+;
+
+NotificationAction:
+    'Notify' '(' message=STRING (',' recipients*=STRING[','])? ')'
+;
+
+ActionParam:
+    name=ID '=' value=PropertyValue
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

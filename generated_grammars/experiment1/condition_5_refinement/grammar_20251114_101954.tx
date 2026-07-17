@@ -1,0 +1,458 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=BrokerConfig
+        auth*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+SystemMetadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+QoSLevel:
+    'AT_MOST_ONCE' | 'AT_LEAST_ONCE' | 'EXACTLY_ONCE'
+;
+
+KeyLocation:
+    'HEADER' | 'QUERY' | 'BODY'
+;
+
+EntityType:
+    'SENSOR' | 'ACTUATOR' | 'CONTROLLER' | 'GATEWAY' | 'HYBRID'
+;
+
+EntityCategory:
+    'LIGHTING' | 'CLIMATE' | 'SECURITY' | 'ENERGY' | 'AUDIO_VIDEO' | 'APPLIANCE' | 'OTHER'
+;
+
+CoordinateSpec:
+    'Coordinates' '(' x=FLOAT ',' y=FLOAT (',' z=FLOAT)? ')'
+;
+
+LocationSpec:
+    'Location' '(' room=STRING (',' zone=STRING)? (',' coordinates=CoordinateSpec)? ')'
+;
+
+DataTypeSpec:
+    'int' | 'float' | 'bool' | 'str' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+RangeConstraint:
+    'range' '(' min=FLOAT ',' max=FLOAT ')'
+;
+
+EnumConstraint:
+    'enum' '(' values*=STRING[','] ')'
+;
+
+LengthConstraint:
+    'length' '(' minLength=INT (',' maxLength=INT)? ')'
+;
+
+PatternConstraint:
+    'pattern' '(' regex=STRING ')'
+;
+
+ConstraintItem:
+    RangeConstraint | EnumConstraint | LengthConstraint | PatternConstraint
+;
+
+PropertyConstraints:
+    constraint_items*=ConstraintItem[',']
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataTypeSpec ('=' defaultValue=PropertyValue)? ('(' constraints=PropertyConstraints ')')?
+;
+
+BehaviorType:
+    'PERIODIC' | 'EVENT_DRIVEN' | 'ON_DEMAND' | 'CONDITIONAL'
+;
+
+IntervalParam:
+    'interval' '=' value=INT
+;
+
+ThresholdParam:
+    'threshold' '=' value=FLOAT
+;
+
+TimeoutParam:
+    'timeout' '=' value=INT
+;
+
+BehaviorParamItem:
+    IntervalParam | ThresholdParam | TimeoutParam
+;
+
+BehaviorParams:
+    param_items*=BehaviorParamItem[',']
+;
+
+BehaviorDef:
+    name=ID ':' behaviorType=BehaviorType ('(' params=BehaviorParams ')')?
+;
+
+CapabilityType:
+    'READ' | 'WRITE' | 'NOTIFY' | 'EXECUTE' | 'SUBSCRIBE'
+;
+
+CapabilityDef:
+    name=ID ':' capabilityType=CapabilityType
+;
+
+StateList:
+    '[' states*=STRING[','] ']'
+;
+
+StateSpec:
+    'State' '(' currentState=STRING (',' possibleStates=StateList)? ')'
+;
+
+MetadataItem:
+    key=STRING ':' value=STRING
+;
+
+EntityMetadata:
+    'Metadata' '(' metadata_items*=MetadataItem[','] ')'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('category:' category=EntityCategory)?
+        ('location:' location=LocationSpec)?
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('capabilities:' '-' capabilities*=CapabilityDef['-'])?
+        ('state:' state=StateSpec)?
+        ('metadata:' metadata=EntityMetadata)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('tokenType:' tokenType=STRING)?
+        ('refreshToken:' refreshToken=STRING)?
+        ('expiry:' expiry=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)
+        ('caPath:' caPath=STRING)?
+        ('passphrase:' passphrase=STRING)?
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=KeyLocation)
+        ('paramName:' paramName=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth | ApiKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('clientId:' clientId=STRING)?
+        ('keepAlive:' keepAlive=INT)?
+        ('cleanSession:' cleanSession=BOOL)?
+        ('qos:' qos=QoSLevel)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=ID)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('routingKey:' routingKey=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=ID)?
+    )#
+    'end'
+;
+
+CoAPBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('observe:' observe=BOOL)?
+        ('confirmable:' confirmable=BOOL)?
+        ('auth:' auth=ID)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | CoAPBroker
+;
+
+EntityTriggerType:
+    'CHANGE' | 'THRESHOLD' | 'PATTERN' | 'ABSENCE'
+;
+
+EntityTrigger:
+    'EntityTrigger' '(' entity=ID ',' property=ID (',' triggerType=EntityTriggerType)? ')'
+;
+
+CronSpec:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSpec:
+    'interval' '(' seconds=INT ')'
+;
+
+AbsoluteTimeSpec:
+    'at' '(' time=STRING ')'
+;
+
+TimeSpec:
+    CronSpec | IntervalSpec | AbsoluteTimeSpec
+;
+
+TimeTrigger:
+    'TimeTrigger' '(' timeSpec=TimeSpec ')'
+;
+
+EventTrigger:
+    'EventTrigger' '(' eventType=STRING (',' source=STRING)? ')'
+;
+
+StateTrigger:
+    'StateTrigger' '(' entity=ID ',' fromState=STRING ',' toState=STRING ')'
+;
+
+TriggerSpec:
+    EntityTrigger | TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonCondition:
+    entity=ID '.' property=ID comparator=ComparisonOperator value=ConditionValue
+;
+
+ObjectPropertyAccess:
+    entity=ID '.' property=ID '.' subProperty=ID
+;
+
+ExistenceCondition:
+    'exists' '(' entity=ID ')'
+;
+
+TimeCondition:
+    'time' comparator=ComparisonOperator timeValue=STRING
+;
+
+StateCondition:
+    entity=ID '.' 'state' comparator=ComparisonOperator state=STRING
+;
+
+SimpleCondition:
+    ComparisonCondition | ObjectPropertyAccess comparator=ComparisonOperator value=ConditionValue | ExistenceCondition | TimeCondition | StateCondition
+;
+
+ConditionTerm:
+    'NOT' term=ConditionTerm | '(' expr=ConditionExpr ')' | SimpleCondition
+;
+
+LogicalOperator:
+    'AND' | 'OR'
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionSpec:
+    condition_expr=ConditionExpr
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<=' | '>=' | '<' | '>' | 'CONTAINS' | 'MATCHES'
+;
+
+ConditionValue:
+    FLOAT | INT | BOOL | STRING
+;
+
+SetOperation:
+    'set' '(' property=ID ',' value=PropertyValue ')'
+;
+
+GetOperation:
+    'get' '(' property=ID ')'
+;
+
+ExecuteOperation:
+    'execute' '(' command=STRING (',' params=ActionParams)? ')'
+;
+
+SubscribeOperation:
+    'subscribe' '(' property=ID (',' callback=STRING)? ')'
+;
+
+EntityOperation:
+    SetOperation | GetOperation | ExecuteOperation | SubscribeOperation
+;
+
+EntityAction:
+    'EntityAction' '(' entity=ID ',' operation=EntityOperation ')'
+;
+
+NotificationChannel:
+    'EMAIL' | 'SMS' | 'PUSH' | 'WEBHOOK'
+;
+
+RecipientList:
+    '[' recipients*=STRING[','] ']'
+;
+
+NotificationAction:
+    'NotificationAction' '(' message=STRING (',' channel=NotificationChannel)? (',' recipients=RecipientList)? ')'
+;
+
+SystemActionType:
+    'LOG' | 'BACKUP' | 'RESTART' | 'SHUTDOWN' | 'MAINTENANCE'
+;
+
+ActionParamPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ActionParams:
+    '{' param_pairs*=ActionParamPair[','] '}'
+;
+
+SystemAction:
+    'SystemAction' '(' actionType=SystemActionType (',' params=ActionParams)? ')'
+;
+
+DelayAction:
+    'DelayAction' '(' duration=INT ')'
+;
+
+ConditionalAction:
+    'ConditionalAction' '(' condition=ConditionSpec ',' thenAction=ActionDef (',' elseAction=ActionDef)? ')'
+;
+
+ActionDef:
+    EntityAction | NotificationAction | SystemAction | DelayAction | ConditionalAction
+;
+
+ScheduleType:
+    'ONCE' | 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CRON'
+;
+
+DayParam:
+    'day' '=' dayValue=STRING
+;
+
+TimeParam:
+    'time' '=' timeValue=STRING
+;
+
+DateParam:
+    'date' '=' dateValue=STRING
+;
+
+CronParam:
+    'cron' '=' cronValue=STRING
+;
+
+ScheduleParamItem:
+    DayParam | TimeParam | DateParam | CronParam
+;
+
+ScheduleParams:
+    schedule_items*=ScheduleParamItem[',']
+;
+
+ScheduleSpec:
+    'Schedule' '(' scheduleType=ScheduleType (',' params=ScheduleParams)? ')'
+;
+
+BackoffStrategy:
+    'LINEAR' | 'EXPONENTIAL' | 'FIXED'
+;
+
+RetrySpec:
+    'Retry' '(' maxAttempts=INT (',' backoffStrategy=BackoffStrategy)? (',' delay=INT)? ')'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('trigger:' trigger=TriggerSpec)
+        ('conditions:' conditions=ConditionSpec)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('schedule:' schedule=ScheduleSpec)?
+        ('retry:' retry=RetrySpec)?
+    )#
+    'end'
+;

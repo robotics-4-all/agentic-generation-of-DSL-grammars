@@ -1,0 +1,246 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        broker=BrokerConfig?
+        authentication=AuthenticationConfig?
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)?
+        ('version:' version=STRING)?
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    'broker'
+    (
+        ('type:' type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('topic_prefix:' topic_prefix=STRING)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'mqtt' | 'amqp' | 'redis'
+;
+
+AuthenticationConfig:
+    'authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('api_key:' api_key=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+AuthMethod:
+    'basic' | 'api_key' | 'certificate' | 'oauth'
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('room:' room=STRING)?
+        ('properties:' properties*=Property[','])?
+        ('behaviors:' behaviors*=Behavior[','])?
+        ('topic:' topic=STRING)?
+        ('status_topic:' status_topic=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'other'
+;
+
+Property:
+    name=ID ':' value=PropertyValue
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Behavior:
+    name=ID '(' parameters*=Parameter[','] ')'
+;
+
+Parameter:
+    name=ID ':' param_type=ParameterType ('=' default=PropertyValue)?
+;
+
+ParameterType:
+    'str' | 'int' | 'float' | 'bool'
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' actions*=Action[','])
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;
+
+TriggerCondition:
+    TimeBasedTrigger | StateChangeTrigger | EventTrigger
+;
+
+TimeBasedTrigger:
+    'time'
+    (
+        ('at:' at=TimeExpression)?
+        ('every:' every=DurationExpression)?
+        ('cron:' cron=STRING)?
+    )#
+;
+
+StateChangeTrigger:
+    'state_change'
+    (
+        ('entity:' entity=[Entity])
+        ('from:' from_state=PropertyValue)?
+        ('to:' to_state=PropertyValue)?
+        ('attribute:' attribute=ID)?
+    )#
+;
+
+EventTrigger:
+    'event'
+    (
+        ('type:' event_type=STRING)
+        ('data:' data=PropertyValue)?
+    )#
+;
+
+TimeExpression:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+DurationExpression:
+    value=INT unit=TimeUnit
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ConditionGroup:
+    left=Condition (operator=LogicalOperator right=Condition)*
+;
+
+Condition:
+    '(' condition=ConditionGroup ')' | SimpleCondition
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | NumericCondition | StringCondition
+;
+
+EntityCondition:
+    entity=[Entity] ('.' attribute=ID)? operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=TimeExpression
+;
+
+NumericCondition:
+    left=NumericExpression operator=ComparisonOperator right=NumericExpression
+;
+
+StringCondition:
+    left=StringExpression operator=StringOperator right=StringExpression
+;
+
+NumericExpression:
+    EntityReference | NUMBER
+;
+
+StringExpression:
+    EntityReference | STRING
+;
+
+EntityReference:
+    entity=[Entity] ('.' attribute=ID)?
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+StringOperator:
+    '==' | '!=' | 'contains' | 'starts_with' | 'ends_with'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+EntityAction:
+    'entity_action'
+    (
+        ('entity:' entity=[Entity])
+        ('behavior:' behavior=STRING)
+        ('parameters:' parameters*=ActionParameter[','])?
+    )#
+;
+
+NotificationAction:
+    'notification'
+    (
+        ('message:' message=STRING)
+        ('target:' target=STRING)?
+        ('priority:' priority=NotificationPriority)?
+    )#
+;
+
+DelayAction:
+    'delay' duration=DurationExpression
+;
+
+ScriptAction:
+    'script'
+    (
+        ('code:' code=STRING)
+        ('language:' language=ScriptLanguage)?
+    )#
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'lua' | 'shell'
+;

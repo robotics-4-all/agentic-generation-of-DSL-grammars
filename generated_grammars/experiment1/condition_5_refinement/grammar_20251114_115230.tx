@@ -1,0 +1,198 @@
+SmartEnvironmentModel:
+    imports*=Import
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationRule
+    )#
+;
+
+Import:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('routing_key:' routing_key=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('channel:' channel=STRING)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+TokenType:
+    'Bearer' | 'API_KEY' | 'JWT'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('properties:' properties*=PropertyDefinition)*
+        ('behaviors:' behaviors*=BehaviorDefinition)*
+        ('broker:' broker=[BrokerConfig])?
+    )#
+    'end'
+;
+
+EntityType:
+    'SENSOR' | 'ACTUATOR' | 'DEVICE' | 'SERVICE' | 'GATEWAY'
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'datetime' | 'json'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+BehaviorDefinition:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('actions:' actions*=ActionDefinition)*
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+TriggerEvent:
+    'ON_CHANGE' | 'ON_THRESHOLD' | 'ON_TIMER' | 'ON_EVENT'
+;
+
+AutomationRule:
+    'Automation' name=ID
+    (
+        ('conditions:' conditions*=ConditionExpression)*
+        ('actions:' actions*=ActionDefinition)*
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+ConditionExpression:
+    PrimitiveCondition (operator=LogicalOperator PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | '(' ConditionExpression ')'
+;
+
+ComparisonCondition:
+    entity=ID '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'TIME' operator=ComparisonOperator time_value=STRING
+;
+
+LogicalOperator:
+    'AND' | 'OR'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+ActionDefinition:
+    EntityAction | NotificationAction | DelayAction
+;
+
+EntityAction:
+    'SET' entity=ID '.' property=ID '=' value=PropertyValue
+;
+
+NotificationAction:
+    'NOTIFY' message=STRING ('to' target=STRING)?
+;
+
+DelayAction:
+    'DELAY' duration=INT 'seconds'
+;

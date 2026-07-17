@@ -1,0 +1,234 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth*=AuthConfig
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json' | 'array'
+;
+
+Value:
+    FLOAT | INT | STRING | BOOL | JsonObject | JsonArray
+;
+
+JsonObject:
+    '{' items*=JsonItem[','] '}'
+;
+
+JsonItem:
+    key=STRING ':' value=Value
+;
+
+JsonArray:
+    '[' items*=Value[','] ']'
+;
+
+Attribute:
+    name=ID ':' data_type=DataType ('=' default_value=Value)?
+;
+
+ActionRef:
+    action=[Action]
+;
+
+Behavior:
+    name=ID ':' action=ActionRef
+;
+
+Entity:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('attributes:' '-' attributes*=Attribute['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'auth' 'basic' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth' 'token' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth' 'cert' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'broker' 'mqtt' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'broker' 'amqp' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)?
+        ('routing_key:' routing_key=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'broker' 'redis' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('channel:' channel=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+CronSpec:
+    'cron' expression=STRING
+;
+
+IntervalSpec:
+    'interval' seconds=INT
+;
+
+AtSpec:
+    'at' time=STRING
+;
+
+TimeSpec:
+    CronSpec | IntervalSpec | AtSpec
+;
+
+StateTrigger:
+    'state' entity=[Entity] '.' attribute=ID operator=ComparisonOperator value=Value
+;
+
+TimeTrigger:
+    'time' time_spec=TimeSpec
+;
+
+EventTrigger:
+    'event' event_type=STRING ('data:' data=JsonObject)?
+;
+
+Trigger:
+    StateTrigger | TimeTrigger | EventTrigger
+;
+
+SimpleCondition:
+    entity=[Entity] '.' attribute=ID operator=ComparisonOperator value=Value
+;
+
+CompoundCondition:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+;
+
+Condition:
+    CompoundCondition | SimpleCondition
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' attribute=ID 'to' value=Value
+;
+
+ServiceAction:
+    'call' service=STRING ('with' parameters=JsonObject)?
+;
+
+DelayAction:
+    'delay' seconds=INT
+;
+
+NotificationAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+Action:
+    EntityAction | ServiceAction | DelayAction | NotificationAction
+;
+
+ExecutionMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+Automation:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('mode:' mode=ExecutionMode)?
+        ('delay:' delay=INT)?
+        ('enabled:' enabled=BOOL)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

@@ -1,0 +1,100 @@
+You are an expert technical writer specializing in domain-specific language (DSL) documentation. Your task is to generate comprehensive, clear, and user-friendly documentation for a textX grammar.
+
+You will be provided with:
+1. The complete grammar specification
+2. Validated sample models organized by complexity level
+3. The domain requirements the grammar was designed to satisfy
+
+Your documentation should help both humans and LLMs understand how to write correct models using this grammar.
+
+=== GRAMMAR SPECIFICATION ===
+
+{{GRAMMAR}}
+
+=== DOMAIN REQUIREMENTS ===
+
+{{REQUIREMENTS}}
+
+=== VALIDATED SAMPLE MODELS ===
+
+{{SAMPLE_MODELS}}
+
+=== DOCUMENTATION REQUIREMENTS ===
+
+Generate a comprehensive markdown documentation that includes:
+
+1. **Executive Summary**
+   - Brief overview of the grammar's purpose (2-3 sentences)
+   - Key capabilities and use cases
+   - Target domain and intended users
+
+2. **Grammar Overview**
+   - High-level explanation of the grammar structure
+   - Main components and their relationships
+   - Design philosophy and key concepts
+
+3. **Syntax Guide**
+   - Detailed explanation of each major grammar rule
+   - For each rule, explain:
+     * What it represents in the domain
+     * When and why to use it
+     * Required vs optional elements
+     * Common patterns and best practices
+   - Use clear, non-technical language where possible
+
+4. **Usage Examples by Complexity**
+   - **Simple Examples**: Demonstrate individual features
+     * Explain what each example shows
+     * Highlight key syntax elements
+     * Provide use case context
+   
+   - **Medium Complexity**: Show feature combinations
+     * Explain how features work together
+     * Demonstrate common patterns
+     * Point out important interactions
+   
+   - **Complex Examples**: Full system demonstrations
+     * Explain the complete model structure
+     * Show real-world application scenarios
+     * Highlight advanced techniques
+
+5. **Common Patterns and Idioms**
+   - Frequently used code patterns
+   - Best practices for model organization
+   - Tips for writing maintainable models
+
+6. **Troubleshooting Guide**
+   - Common syntax errors and how to fix them
+   - Validation error patterns
+   - Debugging tips
+
+7. **Quick Reference**
+   - Compact syntax cheat sheet
+   - Rule summary table
+   - Terminal and non-terminal quick lookup
+
+=== OUTPUT FORMAT ===
+
+Provide well-structured markdown with:
+- Clear section headings (H2 for main sections, H3 for subsections)
+- Code blocks with proper syntax highlighting (use ``` with no language specifier for DSL code)
+- **Bold** for important terms and concepts
+- `code formatting` for rule names, keywords, and technical terms
+- Tables for quick reference sections
+- > Blockquotes for tips, warnings, and best practices
+- Emoji markers for visual scanning: ✓ for correct, ✗ for incorrect, ⚠ for warnings, 💡 for tips
+
+Make the documentation:
+- **Clear**: Use plain language, avoid jargon
+- **Complete**: Cover all grammar rules and features
+- **Practical**: Focus on real usage scenarios
+- **Accessible**: Suitable for beginners and experts
+- **Scannable**: Easy to find information quickly
+
+Do NOT include:
+- Implementation details of the grammar validator
+- TextX-specific technical details
+- References to the generation process
+- Meta-commentary about the documentation itself
+
+Focus on teaching users HOW to write correct models using this grammar.

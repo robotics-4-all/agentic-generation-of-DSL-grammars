@@ -1,0 +1,232 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentications*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('baseTopic:' baseTopic=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('basePath:' basePath=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response' | 'notify'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+PropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+TimeSpec:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+TimeValue:
+    'now' | 'today' | time=TimeSpec
+;
+
+ConstantValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ConditionOperand:
+    PropertyRef | ConstantValue | TimeValue
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'startsWith' | 'endsWith'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    operand1=ConditionOperand operator=ComparisonOperator operand2=ConditionOperand
+;
+
+ComplexCondition:
+    '(' left=SimpleCondition ')' logicalOp=LogicalOperator '(' right=SimpleCondition ')'
+;
+
+Condition:
+    ComplexCondition | SimpleCondition
+;
+
+JSONArray:
+    '[' items*=JSONValue[','] ']'
+;
+
+JSONValue:
+    STRING | FLOAT | INT | BOOL | JSON | JSONArray
+;
+
+JSONItem:
+    key=STRING ':' value=JSONValue
+;
+
+JSON:
+    '{' items*=JSONItem[','] '}'
+;
+
+ActionMessage:
+    STRING | PropertyRef | JSON
+;
+
+ActionParam:
+    name=ID ':' value=ConstantValue
+;
+
+ActionParams:
+    '[' params*=ActionParam[','] ']'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+PublishAction:
+    'publish' '(' target=[Entity] ',' message=ActionMessage ')'
+;
+
+CallAction:
+    'call' '(' target=[Entity] ',' method=STRING ',' params=ActionParams? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+ScriptAction:
+    'script' '(' code=STRING ')'
+;
+
+Action:
+    PublishAction | CallAction | DelayAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Condition)
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

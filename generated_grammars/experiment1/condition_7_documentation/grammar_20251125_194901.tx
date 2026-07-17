@@ -1,0 +1,246 @@
+SmAutoModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        (brokers*=MessageBroker)
+        (entities*=Entity)
+        (automations*=Automation)
+    )#
+;
+
+Import:
+    'import' importURI=STRING ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    AuthPlain | AuthToken | AuthCert
+;
+
+AuthPlain:
+    'plain'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+AuthToken:
+    'token'
+    (
+        ('key:' key=STRING)
+        ('value:' value=STRING)
+    )#
+;
+
+AuthCert:
+    'cert'
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+    )#
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('baseTopic:' baseTopic=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('exchange:' exchange=STRING)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('basePath:' basePath=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid' | 'controller' | 'gateway'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+JsonItem:
+    name=STRING ':' value=PropertyValue
+;
+
+JsonValue:
+    '{' items*=JsonItem[','] '}'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL | JsonValue
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorOperation:
+    'read' | 'write' | 'subscribe' | 'publish' | 'command'
+;
+
+Behavior:
+    name=ID ':' operation=BehaviorOperation
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+ValueOperand:
+    PropertyValue |
+    EntityPropertyRef
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TIME:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+DATE:
+    year=INT '-' month=INT '-' day=INT
+;
+
+DATETIME:
+    date=DATE 'T' time=TIME
+;
+
+TimeValue:
+    TIME | DATE | DATETIME
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+ValueCondition:
+    leftOperand=ValueOperand operator=ComparisonOperator rightOperand=ValueOperand
+;
+
+Condition:
+    '(' group=ConditionGroup ')' |
+    EntityCondition |
+    TimeCondition |
+    ValueCondition
+;
+
+ConditionGroup:
+    left=Condition (operator=LogicalOperator right=Condition)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=PropertyValue
+;
+
+NotificationAction:
+    'notify' message=STRING ('via' broker=[MessageBroker])?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ScriptAction:
+    'execute' script=STRING
+;
+
+Action:
+    EntityAction |
+    NotificationAction |
+    DelayAction |
+    ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' conditions=ConditionGroup)
+        ('actions:' '-' actions*=Action['-'])
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

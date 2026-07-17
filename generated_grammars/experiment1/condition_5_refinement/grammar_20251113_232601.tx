@@ -1,0 +1,165 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)?
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerType:
+    'MQTT' | 'AMQP' | 'WebSocket' | 'HTTP'
+;
+
+AuthMethod:
+    'basic' | 'token' | 'certificate' | 'oauth'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+TriggerType:
+    'time' | 'event' | 'state_change' | 'value_change'
+;
+
+LogicalOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'and' | 'or' | 'not'
+;
+
+ActionType:
+    'set' | 'toggle' | 'send' | 'call' | 'notify' | 'delay'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+BrokerConfig:
+    'broker' name=ID
+    (
+        ('type:' broker_type=BrokerType)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('topic:' topic=STRING)?
+        ('credentials:' credentials=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    'auth' name=ID
+    (
+        ('method:' method=AuthMethod)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+PropertyDefinition:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+ParameterDefinition:
+    name=ID ':' param_type=DataType
+;
+
+EntityPropertyRef:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+EntityDefinition:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('properties:' properties*=PropertyDefinition[','])?
+        ('behaviors:' behaviors*=BehaviorDefinition[','])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+BehaviorDefinition:
+    name=ID '(' parameters*=ParameterDefinition[',']? ')' actions*=ActionDefinition[',']?
+;
+
+TriggerParam:
+    name=ID '=' value=PropertyValue
+;
+
+TriggerParameters:
+    params*=TriggerParam[',']
+;
+
+TriggerCondition:
+    'on' trigger_type=TriggerType '(' trigger_params=TriggerParameters ')'
+;
+
+ActionParam:
+    name=ID '=' value=ActionValue
+;
+
+ActionParameters:
+    params*=ActionParam[',']?
+;
+
+ActionDefinition:
+    action_type=ActionType '(' action_params=ActionParameters ')'
+;
+
+ActionValue:
+    PropertyValue | EntityPropertyRef
+;
+
+ExecutionControl:
+    'mode:' mode=ExecutionMode ('delay:' delay=INT)?
+;
+
+ConditionOperand:
+    EntityPropertyRef | PropertyValue | '(' condition=ConditionSpec ')'
+;
+
+ConditionSpec:
+    left=ConditionOperand (operator=LogicalOperator right=ConditionOperand)*
+;
+
+AutomationDeclaration:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerCondition)
+        ('conditions:' conditions*=ConditionSpec[','])?
+        ('actions:' actions*=ActionDefinition[','])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

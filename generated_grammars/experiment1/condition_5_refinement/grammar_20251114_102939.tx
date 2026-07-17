@@ -1,0 +1,254 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+SystemMetadata:
+    'metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataTypeDef:
+    'string' | 'number' | 'bool' | 'object' | 'array'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ComparisonOp:
+    '==' | '!=' | '>=' | '<=' | '>' | '<' | 'contains' | 'matches'
+;
+
+LogicalOp:
+    'and' | 'or' | 'not'
+;
+
+ArithmeticOp:
+    '+' | '-' | '*' | '/' | '%'
+;
+
+BasicAuth:
+    'auth<basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'auth<token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'auth<cert>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBrokerConfig:
+    'broker<mqtt>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBrokerConfig:
+    'broker<amqp>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBrokerConfig:
+    'broker<redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBrokerConfig | AMQPBrokerConfig | RedisBrokerConfig
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataTypeDef ('=' defaultValue=ValueTerm)?
+;
+
+BehaviorDef:
+    name=ID ':' action=ActionExpr
+;
+
+LocationDef:
+    room=STRING (',' zone=STRING)?
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('location:' location=LocationDef)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' expression=STRING
+;
+
+IntervalSchedule:
+    'every' interval=INT unit=TimeUnit
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+EntityTrigger:
+    'entity' entity=[EntityDef] 'property' property=ID operator=ComparisonOp value=ValueTerm
+;
+
+TimeTrigger:
+    'time' schedule=TimeSchedule
+;
+
+EventTrigger:
+    'event' eventType=STRING
+;
+
+TriggerExpr:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityCondition:
+    entity=[EntityDef] 'property' property=ID operator=ComparisonOp value=ValueTerm
+;
+
+TimeValue:
+    time=STRING
+;
+
+TimeCondition:
+    'time' operator=ComparisonOp value=TimeValue
+;
+
+ValueCondition:
+    left=ValueTerm operator=ComparisonOp right=ValueTerm
+;
+
+SimpleCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+ConditionTerm:
+    SimpleCondition | '(' expr=ConditionExpr ')'
+;
+
+ConditionExpr:
+    left=ConditionTerm (operator=LogicalOp right=ConditionTerm)*
+;
+
+EntityAction:
+    'set' entity=[EntityDef] 'property' property=ID 'to' value=ValueTerm
+;
+
+NotifyAction:
+    'notify' message=STRING ('via' channel=STRING)?
+;
+
+DelayAction:
+    'delay' duration=INT unit=TimeUnit
+;
+
+ScriptAction:
+    'script' code=STRING
+;
+
+ActionDef:
+    EntityAction | NotifyAction | DelayAction | ScriptAction
+;
+
+ActionExpr:
+    'action' action=ActionDef
+;
+
+LiteralValue:
+    NUMBER | STRING | BOOL
+;
+
+PropertyRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+ComputedValue:
+    left=ValueTerm operator=ArithmeticOp right=ValueTerm
+;
+
+ValueTerm:
+    PropertyRef | LiteralValue
+;
+
+ValueExpr:
+    ComputedValue | ValueTerm
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('trigger:' trigger=TriggerExpr)
+        ('conditions:' conditions=ConditionExpr)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

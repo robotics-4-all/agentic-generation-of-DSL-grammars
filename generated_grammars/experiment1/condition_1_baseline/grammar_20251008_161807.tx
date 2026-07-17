@@ -1,0 +1,380 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=BrokerConfig)*
+    (authentication=AuthenticationConfig)?
+    (entities*=EntityDefinition)*
+    (automations*=AutomationRule)*
+    (conditions*=ConditionSpec)*
+    (actions*=ActionDefinition)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | CoapBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+CoapBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)?
+        ('secure:' secure=BOOL)?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=CredentialSpec)
+        ('timeout:' timeout=INT)?
+        ('retry_attempts:' retry_attempts=INT)?
+    )#
+    'end'
+;
+
+AuthMethod:
+    'basic' | 'oauth2' | 'api_key' | 'certificate' | 'jwt'
+;
+
+CredentialSpec:
+    BasicCredentials | OAuth2Credentials | ApiKeyCredentials | CertificateCredentials
+;
+
+BasicCredentials:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+OAuth2Credentials:
+    'OAuth2'
+    (
+        ('client_id:' client_id=STRING)
+        ('client_secret:' client_secret=STRING)
+        ('token_url:' token_url=STRING)
+        ('scope:' scope=STRING)?
+    )#
+    'end'
+;
+
+ApiKeyCredentials:
+    'ApiKey'
+    (
+        ('key:' key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+CertificateCredentials:
+    'Certificate'
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('capabilities:' capabilities*=CapabilitySpec[','])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)? 
+    ('unit:' unit=STRING)? ('readonly:' readonly=BOOL)?
+;
+
+DataType:
+    'string' | 'integer' | 'float' | 'boolean' | 'json' | 'binary' | 'timestamp'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType 
+    ('params:' params=BehaviorParams)?
+    ('frequency:' frequency=INT)?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'request_response' | 'continuous'
+;
+
+BehaviorParams:
+    '{' param_items*=ParamItem[','] '}'
+;
+
+ParamItem:
+    name=ID ':' value=PropertyValue
+;
+
+CapabilitySpec:
+    'read' | 'write' | 'execute' | 'subscribe' | 'publish'
+;
+
+AutomationRule:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerSpec)
+        ('conditions:' conditions*=[ConditionSpec][','])? 
+        ('actions:' actions*=[ActionDefinition][','])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+TriggerSpec:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+EventTrigger:
+    'event' '(' entity=[EntityDefinition] ',' event_type=STRING ')'
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[EntityDefinition] ',' property=ID ',' condition=ComparisonOp ',' value=PropertyValue ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('max_retries:' max_retries=INT)?
+        ('timeout:' timeout=INT)?
+        ('parallel:' parallel=BOOL)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'queued' | 'scheduled' | 'conditional'
+;
+
+ConditionSpec:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('evaluation:' evaluation=EvaluationType)?
+        ('context:' context=ContextSpec)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ComparisonExpression:
+    '(' expr=LogicalExpression ')' |
+    left=ValueReference op=ComparisonOp right=ValueSpec
+;
+
+ValueReference:
+    entity=[EntityDefinition] '.' property=ID |
+    system_var=SystemVariable |
+    constant=PropertyValue
+;
+
+SystemVariable:
+    'CURRENT_TIME' | 'SYSTEM_STATUS' | 'USER_PRESENCE' | 'ENVIRONMENT_STATE'
+;
+
+ValueSpec:
+    ValueReference | PropertyValue
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+EvaluationType:
+    'real_time' | 'batch' | 'event_driven' | 'periodic'
+;
+
+ContextSpec:
+    'Context'
+    (
+        ('scope:' scope=STRING)
+        ('variables:' variables*=ContextVariable[','])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ContextVariable:
+    name=ID '=' value=PropertyValue
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=ActionTarget)
+        ('parameters:' parameters=ActionParameters)?
+        ('retry_policy:' retry_policy=RetryPolicy)?
+        ('validation:' validation=ValidationSpec)?
+    )#
+    'end'
+;
+
+ActionType:
+    'control' | 'notification' | 'data_collection' | 'system_operation' | 'external_call'
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | ExternalTarget
+;
+
+EntityTarget:
+    'entity' '(' entity=[EntityDefinition] ',' operation=STRING ')'
+;
+
+ServiceTarget:
+    'service' '(' service_name=STRING ',' endpoint=STRING ')'
+;
+
+ExternalTarget:
+    'external' '(' url=STRING ',' method=HTTPMethod ')'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+ActionParameters:
+    '{' action_params*=ActionParam[','] '}'
+;
+
+ActionParam:
+    name=ID ':' value=ActionValue
+;
+
+ActionValue:
+    PropertyValue | ValueReference | ComputedValue
+;
+
+ComputedValue:
+    'compute' '(' expression=STRING ')'
+;
+
+RetryPolicy:
+    'RetryPolicy'
+    (
+        ('max_attempts:' max_attempts=INT)
+        ('delay:' delay=INT)
+        ('backoff:' backoff=BackoffStrategy)?
+    )#
+    'end'
+;
+
+BackoffStrategy:
+    'linear' | 'exponential' | 'fixed'
+;
+
+ValidationSpec:
+    'Validation'
+    (
+        ('required_fields:' required_fields*=ID[','])?
+        ('format_checks:' format_checks*=FormatCheck[','])?
+        ('range_checks:' range_checks*=RangeCheck[','])?
+    )#
+    'end'
+;
+
+FormatCheck:
+    field=ID ':' format_type=FormatType
+;
+
+FormatType:
+    'email' | 'url' | 'json' | 'xml' | 'numeric' | 'regex'
+;
+
+RangeCheck:
+    field=ID ':' min_value=PropertyValue '..' max_value=PropertyValue
+;

@@ -1,0 +1,1053 @@
+
+Grammar Generation prompt
+
+Task:
+You are an expert Domain specific language engineer. Your task is to create a textX DSL grammar for conversational assistants named dFlow. 
+
+
+
+Here are the requirements for Grammar you should create:
+R1 - The grammar should support trainable entity definitions with a name and comma-separated example words for domain-specific entities that need training.
+R2 - The grammar should support pretrained entity types from spacy including PERSON, NORP, FAC, ORG, GPE, LOC, PRODUCT, EVENT, WORK_OF_ART, LAW, LANGUAGE, DATE, TIME, PERCENT, MONEY, QUANTITY, ORDINAL, and CARDINAL.
+R3 - The grammar should support synonym definitions with a name and comma-separated words that map to the same value.
+R4 - The grammar should support external HTTP service definitions (EServiceHTTP) with name, verb (GET, POST, PUT), host, optional port, and optional path properties.
+R5 - The grammar should support global slot definitions with name, type (int, float, str, bool, list, dict), and optional default value for global scope variables.
+R6 - The grammar should support intent trigger definitions with a name and training phrases that can include plain strings, trainable entity references (TE:), pretrained entity references (PE:) with optional example words in brackets, and synonym references (S:).
+R7 - The grammar should support event trigger definitions with a name and URI for external triggers such as IoT events or notifications.
+R8 - The grammar should support dialogue definitions with a name, list of trigger references to activate on, and list of responses (ActionGroups or Forms).
+R9 - The grammar should support ActionGroup definitions containing a sequence of actions: Speak actions with text, FireEvent actions with URI and message, RESTCall actions referencing external services with query/header/path/body parameters and optional response filtering, SetFSlot actions to set form slot values, and SetGSlot actions to set global slot values.
+R10 - The grammar should support Form definitions for collecting information with form parameters (slots) that have name, type (int, float, str, bool, list, dict), and source which can be HRI (asking user with text and optional entity/intent extraction) or EService call results.
+R11 - The grammar should support parameter values as literals (int, float, string, bool), lists, dictionaries, form parameter references with optional indexing, global slot references with optional indexing, and environment properties (user or system).
+R12 - The grammar should support user environment properties: NAME, SURNAME, AGE, EMAIL, PHONE, CITY, ADDRESS accessible via USER: prefix.
+R13 - The grammar should support system environment properties: TIME, LOCATION, RANDOM_INT, RANDOM_FLOAT accessible via SYSTEM: prefix.
+R14 - The grammar should support text composition in Speak actions and form questions combining string literals, form parameter references, global slot references, and environment properties.
+R15 - The grammar should support Slack connector configuration with token, channel, and signing_secret properties.
+R16 - The grammar should support Telegram connector configuration with token, verify, and webhook_url properties.
+R17 - The grammar should support access control role definitions with comma-separated role names and a mandatory default role for unauthenticated users.
+R18 - The grammar should support user-role assignments mapping role names to comma-separated user identifiers (emails).
+R19 - The grammar should support policy definitions with name, list of action names the policy applies to (on:), and list of roles allowed to execute those actions (roles:).
+R20 - The grammar should support inline role-based policies on individual actions within ActionGroups using [roles=role_name] syntax.
+R21 - The grammar should support authentication method configuration with options: slot (using slot content), user_id (using sender_id), slack (using Slack email), or telegram (using Telegram email), with optional slot_name for slot authentication.
+R22 - The grammar should support optional path definition for loading user-role mappings from an external file in JSON format.
+R23 - The grammar should support access control definition combining roles, users (optional if using path), policies, optional path, and authentication method.
+R24 - The grammar should support a model structure that can include entities section, synonyms section, global slots (gslots) section, triggers section, dialogues section, external services (eservices) section, connectors section, and access_controls section.
+
+/*
+    Specification of textX grammar language in textX.
+*/
+
+TextxModel:
+    imports_or_references*=ImportOrReferenceStm
+    rules*=TextxRule
+;
+
+ImportOrReferenceStm:
+    ImportStm | ReferenceStm
+;
+
+ImportStm:
+    'import' grammar_to_import=GrammarToImport
+;
+
+ReferenceStm:
+    'reference' language_name=LanguageName ('as' language_alias=ID)?
+;
+
+GrammarToImport:
+    /(\w|\.)+/
+;
+
+LanguageName:
+    /(\w|-)+/
+;
+
+// Rules
+TextxRule:
+    name=ID ('[' params+=RuleParam[','] ']')? ':'
+        body=TextxRuleBody
+    ';'
+;
+
+RuleParam:
+    name=ID ('=' value=STRING)?
+;
+
+TextxRuleBody:
+    Choice
+;
+
+Choice:
+    sequences+=Sequence['|']
+;
+
+Sequence:
+    repeatable_exprs+=RepeatableExpr
+;
+
+RepeatableExpr:
+    expr=Expression operator=RepeatOperator? ('-')?
+;
+
+Expression:
+    assignment=Assignment
+    | (predicate=SyntacticPredicate?
+       (simple_match=SimpleMatch
+        | rule_ref=RuleRef
+        | bracketed_choice=BracketedChoice ))
+;
+
+
+BracketedChoice:
+    '(' choice=Choice ')'
+;
+
+RepeatOperator:
+    op_sign=OperatorSign ('[' modifiers=RepeatModifiers ']')?
+;
+
+OperatorSign:
+	"*" | "?" | "+" | "#"
+;
+
+RepeatModifiers:
+      (SimpleMatch+ | 'eolterm')
+;
+
+
+SyntacticPredicate:
+    "!" | "&"
+;
+
+SimpleMatch:
+    StrMatch | ReMatch
+;
+
+StrMatch:
+    match=STRING
+;
+
+ReMatch:
+    '/' match=/((\\/)|[^\/])*/ '/'
+;
+
+
+// Assignment
+Assignment:
+    attribute=ID operator=AssignmentOp rhs=AssignmentRhs
+;
+
+AssignmentOp:
+    "=" | "*=" | "+=" | "?="
+;
+
+AssignmentRhs:
+    (simple=SimpleMatch | reference=Reference)  ('[' modifiers=RepeatModifiers ']')?
+;
+
+// References
+Reference:
+    rule=RuleRef | obj=ObjRef
+;
+
+RuleRef:
+    builtin=BuiltinRuleRef | plain=ID
+;
+
+BuiltinRuleRef:
+    'ID' | 'BOOL' | 'INT' | 'FLOAT' | 'STRING' | 'NUMBER' | 'BASETYPE'
+;
+
+ObjRef: // TODO: Remove '|' separator in 4.0
+    '[' name=ClassName ((':' | '|') obj_ref_rule=ID ('|' rrel=RRELExpression))? ']'
+;
+
+ClassName:
+    QualifiedIdent
+;
+
+
+// RREL
+RRELExpression: multi?="+m:" sequence=RRELSequence;
+RRELSequence: paths+=RRELPath[','];
+RRELPath: ((up='^' | dots=RRELDots)? parts+=RRELPathPart['.']) | (up='^' | dots=RRELDots);
+RRELPathPart: RRELZeroOrMore | RRELPathElement;
+RRELZeroOrMore: element=RRELPathElement '*';
+RRELPathElement: RRELParent | RRELBrackets | RRELNavigation;
+RRELDots: /\.+/;
+RRELBrackets: '(' sequence=RRELSequence ')';
+RRELNavigation: noconsume?='~' attr=ID;
+RRELParent: 'parent' '(' type=ID ')';
+
+
+QualifiedIdent:
+    /\w+(\.\w+)?/
+;
+
+// Comments
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+This is a production-ready example textX Grammar so you can study the syntax of the textX grammar in real world development:
+
+Goal-dsl grammar:
+
+AreaGoal:
+   RectangleAreaGoal     |
+   CircularAreaGoal      |
+   StraightLine          |
+   MovingAreaGoal        |
+   PolylineAreaGoal
+;
+
+
+RectangleAreaGoal:
+   'Goal<RectangleArea>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('bottomLeftEdge:' bottomLeftEdge=Point )
+       ('lengthX:' lengthX=NUMBER)
+       ('lengthY:' lengthY=NUMBER)
+       ('tag:' tag=AreaGoalTag )
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#  // Any order
+   'end'
+;
+
+PolylineAreaGoal:
+   'Goal<PolylineArea>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('points:' '[' points+=Point[','] ']' )
+       ('tag:' tag=AreaGoalTag )
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#  // Any order
+   'end'
+;
+
+MovingAreaGoal:
+   'Goal<MovingArea>' name=ID
+   (
+       ('movingEntity:' entity=[Entity:FQN|+pm:entities*])
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('radius:' radius=NUMBER)
+       ('tag:' tag=AreaGoalTag)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#  // Any order
+   'end'
+;
+
+CircularAreaGoal:
+   'Goal<CircularArea>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('center:' center=Point)
+       ('radius:' radius=NUMBER)
+       ('tag:' tag=AreaGoalTag)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+StraightLine:
+   'Goal<StraightLine>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('startPoint:' startPoint=Point)
+       ('endPoint:' endPoint=Point)
+       ('tag:' tag=AreaGoalTag)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+AreaGoalTag: 'ENTER' | 'EXIT' | 'AVOID' | 'STEP';
+
+MessageBroker:
+   AMQPBroker | MQTTBroker | RedisBroker
+;
+
+
+Authentication: AuthPlain | AuthApiKey | AuthCert;
+
+AuthPlain:
+   'username' ':' username=STRING
+   'password' ':' password=STRING
+;
+
+AuthApiKey:
+   'key' ':' key=STRING
+;
+
+AuthCert:
+   ('cert' ':' cert=STRING) | ('certPath' ':' certPath=STRING)
+;
+
+AMQPBroker:
+   'Broker<AMQP>' name=ID
+   (
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('vhost:' vhost=STRING)?
+       ('topicExchange:' topicE=STRING)?
+       ('rpcExchange:' rpcE=STRING)?
+       ('ssl' ':' ssl=BOOL)?
+       ('auth' ':' auth=Authentication)?
+   )#
+   'end'
+;
+
+MQTTBroker:
+   'Broker<MQTT>' name=ID
+   (
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('ssl' ':' ssl=BOOL)?
+       ('basePath:' basePath=STRING)?
+       ('webPath:' webPath=STRING)?
+       ('webPort:' webPort=INT)?
+       ('auth' ':' auth=Authentication)?
+   )#
+   'end'
+;
+
+RedisBroker:
+   'Broker<Redis>' name=ID
+   (
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('db:' db=INT)?
+       ('ssl' ':' ssl=BOOL)?
+       ('auth' ':' auth=Authentication)?
+   )#
+   'end'
+;
+
+
+RESTEndpoint:
+   'RESTEndpoint' name=ID
+   (
+       ('verb:' verb=RESTVerb)
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('path:' path=STRING)
+       ('base_url:' baseUrl=STRING)?
+       (
+       'params:'
+           ('query:' '-' queryParams*=Property['-'])?
+           ('path:' '-' pathParams*=Property['-'])?
+           ('body:' '-' bodyParams*=Property['-'])?
+       ('headers:' '-' headers*=Property['-'])?
+       )?
+   )#
+   'end'
+;
+
+RESTVerb:
+   'GET'       |
+   'POST'      |
+   'PUT'       |
+   'DELETE'
+;
+
+// === Conditions ===
+
+TermPool:
+   'TermPool' name=ID
+   (
+       conditions*=Condition
+   )#
+   'end'
+;
+
+Condition:
+   r1=ConditionGroup (operator=LogicalOperator r2=ConditionGroup)*
+;
+
+ConditionGroup:
+   '(' r=Condition ')'
+   | PrimitiveCondition
+   | MathExpression
+;
+
+PrimitiveCondition:
+   BoolCondition       |
+   TimeCondition       |
+   NumericCondition    |
+   StringCondition     |
+   ListCondition       |
+   DictCondition
+;
+
+MathExpression:
+   left=MathTerm (operator=PlusOrMinus right=MathTerm)*
+;
+
+MathTerm:
+   left=MathFactor (operator=MulOrDiv right=MathFactor)*
+;
+
+MathFactor:
+   (sign=PlusOrMinus)?
+   (
+       op=MathOperand | '(' op=MathExpression ')'
+   )
+;
+
+MathOperand:
+   (
+   op=NUMBER                  |
+   op=BuiltinNumericFunctions  |
+   op=AttributeRef
+   )
+;
+
+AttributeRef:
+   DictAttributeRef    |
+   ListAttributeRef    |
+   SimpleAttributeRef
+;
+
+SimpleAttributeRef:
+   attribute=[Attribute:FQN|+m:entities.attributes]
+;
+
+DictAttributeRef:
+   attribute=[Attribute:FQN|+pm:entities.attributes] (('[' key=STRING ']')*)?
+;
+
+ListAttributeRef:
+   attribute=[Attribute:FQN|+pm:entities.attributes] (('[' index=INT ']')*)?
+;
+
+PlusOrMinus: '+' | '-';
+MulOrDiv: '*' | '/' ;
+
+NumericCondition:
+   (operand1=MathExpression
+    operator=NumericOperator
+    operand2=MathExpression)
+;
+
+StringCondition:
+   (operand1=AttributeRef
+    operator=StringOperator
+    (operand2=STRING | operand2=AttributeRef))
+;
+
+BoolCondition:
+   (operand1=AttributeRef
+    operator=BooleanOperator
+    (operand2=BOOL | operand2=AttributeRef))
+;
+
+ListCondition:
+   (operand1=AttributeRef
+    operator=ListOperator
+    (operand2=List | operand2=AttributeRef))
+;
+
+DictCondition:
+   (operand1=AttributeRef
+    operator=DictOperator
+    (operand2=Dict | operand2=AttributeRef))
+;
+
+TimeCondition:
+   (operand1=AttributeRef
+    operator=TimeOperator
+    operand2=AttributeRef)
+;
+
+StdAttr:
+   'std' '(' attribute=MathOperand ',' size=INT ')'
+;
+
+VarAttr:
+   'var' '(' attribute=MathOperand ',' size=INT ')'
+;
+
+MeanAttr:
+   'mean' '(' attribute=MathOperand  ',' size=INT ')'
+;
+
+MinAttr:
+   'min' '(' attribute=MathOperand  ',' size=INT ')'
+;
+
+MaxAttr:
+   'max' '(' attribute=MathOperand  ',' size=INT ')'
+;
+
+InRangeAttr:
+   'inrange' '(' attribute=MathOperand  ',' min=NUMBER ',' max=NUMBER ')'
+;
+
+
+BuiltinNumericFunctions:
+   StdAttr         |
+   VarAttr         |
+   MeanAttr        |
+   MinAttr         |
+   MaxAttr         |
+   InRangeAttr
+;
+
+// Operators
+
+// SharedOperator: '==' | '!=' | 'is' | 'is not';
+
+StringOperator: '~' | '!~' | '==' | '!=' | 'is not' | 'is' | 'has' | 'in' | 'not in';
+
+NumericOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+
+LogicalOperator: 'and' | 'or' | 'not' | 'xor' | 'nor' | 'xnor' | 'nand';
+
+BooleanOperator: '==' | '!=' | 'is not' | 'is';
+
+ListOperator: '==' | '!=' | 'is' | 'is not' | 'in' | 'not in';
+
+DictOperator: '==' | '!=' | 'is' | 'is not';
+
+TimeOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+
+EntitySource:
+   (ref=[MessageBroker])       |
+   (ref=[RESTEndpoint])
+;
+
+/*
+EntitySource:
+   BrokerSource |
+   RestSource
+;
+
+BrokerSource:
+   brokerRef=[MessageBroker] '@' uri=STRING
+;
+
+RestSource:
+   endpointRef=[RESTEndpoint]
+;
+*/
+
+/*
+DBSQLSource:
+   dbRef=[DBSQL] '@' query=STRING
+;
+
+DBNoSQLource:
+   dbRef=[DBNoSQL] '@' collection=STRING ',' filter=STRING
+;
+*/
+
+Entity:
+   'Entity' name=ID
+   (
+       ('type:' etype=EntityType)
+       ('source:' source=EntitySource)
+       ('mode:' mode=EntityMode)?
+       ('freq:' mode=NUMBER)?
+       ('attributes:' '-' attributes*=Attribute['-'])?
+       ('uri:' uri=STRING)?
+       ('description:' description=STRING)?
+       ('compartments'
+           entities*=Entity
+       'end')?
+   )#
+   'end'
+;
+
+EntityType:
+   'sensor'    |
+   'actuator'  |
+   'hybrid'    |
+   'robot'     |
+   'other'
+;
+
+EntityMode:
+   'virtual'       |
+   'simulation'    |
+   'real'          |
+   'digitwin'      |
+   'other'
+;
+
+Attribute:
+   name=ID ':' dtype=[DataType:FQN|+m:types*]
+       ( '('precision_x=INT (',' precision_y=INT)? ')' )?
+       ( '[' lower=MultiplicityBound (',' upper=MultiplicityBound )? ']' )?
+;
+
+EntityGoal:
+   EntityStateChangeGoal       |
+   EntityStateConditionGoal    |
+   EntityPyConditionGoal       |
+   EntityAttrStreamGoal
+;
+
+EntityStateChangeGoal:
+   'Goal<EntityStateChange>' name=ID
+   (
+       // ('entities:' '-' entities*=[Entity:FQN|+m:entities*]['-'])
+       ('entity:' entity=[Entity:FQN|+m:entities*])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+EntityStateConditionGoal:
+   'Goal<EntityStateCondition>' name=ID
+   (
+       ('condition:' condition=Condition)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+EntityPyConditionGoal:
+   'Goal<EntityPyCondition>' name=ID
+   (
+       ('condition:' condition=STRING)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+/*
+EntityAttrStreamGoal:
+   'Goal<EntityAttrStream>' name=ID
+   (
+       ('streams:' '-' streams+=AttrStreamDefinition['-'])
+       // ('strategy:' strategy=[EntityAttrStreamStrategy])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+AttrStreamDefinition:
+   attr=[Attribute:FQN|+pm:entities.attributes*] ':' '[' values+=BASETYPE[','] ']' '->' strategy=[EntityAttrStreamStrategy]
+;
+*/
+
+
+EntityAttrStreamGoal:
+   'Goal<EntityAttrStream>' name=ID
+   (
+       ('stream:' stream=AttrStreamDefinition)
+       ('strategy:' strategy=[EntityAttrStreamStrategy])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+
+AttrStreamDefinition:
+   attr=[Attribute:FQN|+pm:entities.attributes*] ':' '[' values+=BASETYPE[','] ']'
+;
+
+EntityAttrStreamStrategy:
+   'ALL'               |
+   'NONE'              |
+   'AT_LEAST_ONE'      |
+   'JUST_ONE'          |
+   'EXACTLY_X'         |
+   'ALL_ORDERED'       |
+   'EXACTLY_X_ORDERED'
+;
+
+EntityStateTransitionGoal:
+   'Goal<EntityStateTransition>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+m:entities*])
+       ('previous:' previous=Condition)
+       ('next:' next=Condition)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+PoseGoal:
+   'Goal<Pose>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('orientation:' orientation=Orientation)
+       ('position:' position=Point)
+       ('maxDeviationPos:' maxDeviationPos=NUMBER)
+       ('maxDeviationOri:' maxDeviationOri=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+OrientationGoal:
+   'Goal<Orientation>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('orientation:' orientation=Orientation)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+PositionGoal:
+   'Goal<Position>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('position:' point=Point)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+TimeConstraint:
+   type=TimeConstraintType '(' (comparator=ArithmeticComparator)? time=FLOAT ')'
+;
+
+ArithmeticComparator: '>' | '<' | '==' | '>=' | '<=';
+
+TimeConstraintType:
+   'FROM_SCENARIO_START'   |
+   'FROM_GOAL_START'       |
+   'FOR_TIME'              |
+   'BETWEEN_GOALS_MIN'     |
+   'BETWEEN_GOALS_MAX'
+;
+
+TrajectoryGoal:
+   StraightLineTrajectoryGoal  |
+   WaypointTrajectoryGoal
+;
+
+StraightLineTrajectoryGoal:
+   'Goal<StraightLineTrajectory>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('startPoint:' startPoint=Point)
+       ('finishPoint:' finishPoint=Point)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+WaypointTrajectoryGoal:
+   'Goal<WaypointTrajectory>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('points:' '[' points+=Point[','] ']')
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+CurveTrajectoryGoal:
+   'Goal<CurveTrajectoryGoal>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('startPoint:' startPoint=Point)
+       ('finishPoint:' finishPoint=Point)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+Time:
+   hour=INT ':' minute=INT (':' second=INT)?
+;
+
+Date: month=INT ':' day=INT ':' year=INT;
+
+// Hours: /[0-2]?[0-9]?/;
+// Minutes: /[0-5][0-9]/;
+
+List:
+   '[' items*=ListItem[','] ']'
+;
+
+ListItem:
+   NUMBER | STRING | BOOL | List | Dict | OBJECT
+;
+
+Dict:
+   '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+   name=STRING ':' value=DictType
+;
+
+DictType:
+   NUMBER | STRING | BOOL | Dict | List | OBJECT
+;
+
+Description: /\#(.*?)$/;
+
+
+DataType: PrimitiveDataType | CustomDataType | Enumeration;
+
+CustomDataType:
+   'DataType' name=ID
+       (description=Description)?
+       properties*=Property  // Each Message has one or more properties.
+   'end'
+;
+
+Enumeration:
+   'Enum' name=ID
+       (description=Description)?
+       elements+=EnumerationElement
+   'end'
+;
+
+EnumerationElement: name=STRING;
+
+// Primitive data types
+PrimitiveDataType:
+   'type' name=ID
+;
+
+Property:
+   ListProperty    |
+   SimpleProperty
+;
+
+SimpleProperty:
+   name=ID ':' type=[DataType:FQN|+m:types] ('=' default=STRING)?
+;
+
+ListProperty:
+   name=ID ':' type=[DataType:FQN|+m:types]'[' ( multiplicity=MultiplicityBound )? ']'
+;
+
+MultiplicityBound:
+   INT | '*'
+;
+
+// Special types
+Point: Point2D | Point3D;
+Orientation: Orientation2D | Orientation3D;
+
+Point2D:
+   'Point2D' '(' x=NUMBER ',' y=NUMBER ')'
+;
+
+Point3D:
+   'Point3D' '(' x=NUMBER ',' y=NUMBER ',' z=NUMBER ')'
+;
+
+Orientation2D:
+   'Orientation2D' '(' z=NUMBER ')'
+;
+
+Orientation3D:
+   'Orientation3D' '(' x=NUMBER ',' y=NUMBER ',' z=NUMBER ')'
+;
+
+// Utilities ------------------------------------->
+
+FQN[noskipws]:
+   /\s*/- ID ('.' ID)*
+;
+
+FQID[noskipws]:
+   /\s*/-
+   LID+['.']
+;
+
+// Language ID
+LID:
+   // Forbid keywords as IDs for better error reporting.
+   !Keyword ID
+;
+
+Import: 'import' importURI=FQN ('as' name=ID)?;
+
+Keyword:
+   'import'
+;
+
+// Special rule for comments. Comments start with //
+Comment: CommentLine | CommentBlock ;
+
+CommentLine: /\/\/.*?$/;
+
+CommentBlock: /\/\*(.|\n)*?\*\//;
+
+MULTILINE_STRING: /\"\"\"(.|\n)*?\"\"\"/;
+
+// <-----------------------------------------------
+
+Goal:
+   EntityGoal           |
+   AreaGoal             |
+   PoseGoal             |
+   PositionGoal         |
+   OrientationGoal      |
+   TrajectoryGoal       |
+   ComplexGoal          |
+   GoalRepeater         |
+   GTermGoal
+;
+
+
+ComplexGoal:
+   'Goal<Complex>' name=ID
+   (
+       ('goals:' '-' goals*=WeightedGoal['-'])
+       ('strategy:' algorithm=[ComplexGoalAlgorithmType])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+       ('xAccomplished:' xAccomplished=INT)?
+   )#
+   'end'
+;
+
+ComplexGoalAlgorithmType:
+   'ALL_ACCOMPLISHED'               |
+   'NONE_ACCOMPLISHED'              |
+   'AT_LEAST_ONE_ACCOMPLISHED'      |
+   'JUST_ONE_ACCOMPLISHED'          |
+   'EXACTLY_X_ACCOMPLISHED'         |
+   'ALL_ACCOMPLISHED_ORDERED'       |
+   'EXACTLY_X_ACCOMPLISHED_ORDERED'
+;
+
+// ======================================================================
+GTermGoal:
+   'Goal<GTerm>' name=ID
+   (
+       ('terms:' '-' terms*=GoalTermDef['-'])
+       ('operator:' operator=LogicalOperator)?
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+GoalTermDef:
+   r1=GoalTermGroup (operator=LogicalOperator r2=GoalTermGroup)*
+;
+
+GoalReference:
+   r=[Goal:FQN|+m:goals*]
+;
+
+GoalTermGroup:
+   '(' r=GoalTermDef ')' |
+   r=GoalReference
+;
+// ======================================================================
+
+GoalRepeater:
+   'Goal<Repeater>' name=ID
+   (
+       ('goal:' goal=[Goal:FQN|+m:goals*])
+       ('times:' times=INT)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+WeightedGoal:
+   goal=[Goal:FQN|+m:goals*] ('->' weight=FLOAT)?
+;
+
+GoalDSLModel:
+   imports*=Import
+   (metadata=Metadata)?
+   (
+       (rtmonitor=RTMonitor)?
+       (brokers*=MessageBroker)
+       (types*=CustomDataType)
+       (entities*=Entity)
+       (goals*=Goal)
+       (restEndpoints*=RESTEndpoint)
+       (scenarios*=Scenario)
+   )#
+;
+
+
+Metadata:
+   'Metadata'
+   (
+       ('name:' name=ID)
+       ('version:' version=STRING)
+       ('author:' author=STRING)?
+       ('email:' email=STRING)?
+       ('description:' description=STRING)?
+   'end'
+   )#
+;
+
+RTMonitor:
+   'RTMonitor'
+   (
+       ('broker:' broker=[MessageBroker])
+       ('namespace:' ns=STRING)?
+       ('eventTopic:' eTopic=STRING)?
+       ('logsTopic:' lTopic=STRING)?
+   'end'
+   )#
+;
+
+
+Scenario:
+   'Scenario' name=ID
+   (
+       ('goals:' '-' goals*=WeightedGoal['-'])
+       ('antigoals:' '-' antigoals*=WeightedGoal['-'])?
+       ('fatals:' '-' fatals*=[Goal:FQN|+m:goals*]['-'])?
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+       ('concurrent:' concurrent=BOOL)?
+       ('tickFreq:' goalTickFreqHz=NUMBER)?
+       ('description:' description=STRING)?
+       ('namespace:' ns=STRING)?
+   )#
+   'end'
+;
+
+These are some common textx syntax errors that you should avoid:
+
+1) Cannot declare multiple delimiters in a single rule using the '|' operator.
+You can use only one delimiter as below
+numbers*=INT[',']
+You cannot use it like this:
+numbers*=INT[',' | '+']
+
+2) Cannot reference undefined classes/rules in your grammar.
+All rule references must be defined somewhere in the grammar.
+Example of INCORRECT usage:
+MyRule: items*=UndefinedRule;
+This will cause: Semantic error: Unknown class/rule "UndefinedRule"
+Example of CORRECT usage:
+MyRule: items*=DefinedRule;
+DefinedRule: name=ID;
+CRITICAL: Ensure all rule references in your grammar are properly defined.
+
+
+CRITICAL: Avoid these syntax errors when generating the grammar and be carefull of the parser constraints.
+
+
+The generated textX grammar should be written in a way to be easy for Large Language Models to generate Models from this grammar. You should not care if the grammar is easily perceivable from a human.
+
+
+CRITICAL: Return ONLY the raw grammar content for a .tx file:
+- NO markdown formatting (no ```, no code blocks, no backticks)
+- NO explanations, descriptions, or additional text
+- NO "Here is the grammar:" or similar introductions
+- ONLY the actual grammar content that can be directly saved to a .tx file
+- The response should start immediately with the grammar content
+
+

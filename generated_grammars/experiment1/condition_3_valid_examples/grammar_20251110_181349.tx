@@ -1,0 +1,252 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth_configs*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+        conditions*=ConditionDef
+        actions*=ActionDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+QoSLevel:
+    '0' | '1' | '2'
+;
+
+TokenType:
+    'Bearer' | 'API-Key' | 'JWT'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid' | 'controller' | 'gateway' | 'device'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+TriggerType:
+    'periodic' | 'event_driven' | 'on_demand' | 'threshold_based'
+;
+
+PriorityLevel:
+    'low' | 'medium' | 'high' | 'critical'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+LogicalOp:
+    'AND' | 'OR' | 'NOT'
+;
+
+ComparisonOp:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'startswith' | 'endswith'
+;
+
+ActionType:
+    'set_property' | 'send_command' | 'trigger_automation' | 'send_notification' | 'log_event'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=TokenType)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=QoSLevel)?
+        ('auth:' auth=[AuthConfig])?
+        ('topics:' '-' topics*=STRING['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+        ('routing_keys:' '-' routing_keys*=STRING['-'])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+        ('channels:' '-' channels*=STRING['-'])?
+    )#
+    'end'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default=PropertyValue)? ('(' unit=STRING ')')?
+;
+
+BehaviorDef:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerType)
+        ('frequency:' frequency=NUMBER)?
+        ('timeout:' timeout=NUMBER)?
+        ('retry_count:' retry_count=INT)?
+    )#
+    'end'
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' duration=NUMBER unit=TimeUnit ')'
+;
+
+OneTimeSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+ScheduleDef:
+    CronSchedule | IntervalSchedule | OneTimeSchedule
+;
+
+EntityReference:
+    entity=[EntityDef] ('.' property=ID)?
+;
+
+ComparisonValue:
+    PropertyValue | EntityReference
+;
+
+ComparisonExpr:
+    left=EntityReference operator=ComparisonOp right=ComparisonValue
+;
+
+LogicalExpression:
+    comparison_expr=ComparisonExpr (logical_op=LogicalOp right_expr=ComparisonExpr)*
+;
+
+ConditionDef:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=NUMBER)?
+        ('persistence:' persistence=BOOL)?
+    )#
+    'end'
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[EntityDef])
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('confirmation:' confirmation=BOOL)?
+        ('rollback:' rollback=[ActionDef])?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('priority:' priority=PriorityLevel)?
+        ('conditions:' '-' conditions*=[ConditionDef]['-'])
+        ('actions:' '-' actions*=[ActionDef]['-'])
+        ('execution:' execution=ExecutionMode)?
+        ('schedule:' schedule=ScheduleDef)?
+    )#
+    'end'
+;

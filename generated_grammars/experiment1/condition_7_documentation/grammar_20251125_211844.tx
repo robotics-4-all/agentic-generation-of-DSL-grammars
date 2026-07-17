@@ -1,0 +1,275 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE'
+;
+
+AuthType:
+    'basic' | 'bearer' | 'apikey' | 'certificate' | 'oauth'
+;
+
+Authentication:
+    'Authentication' name=ID
+    (
+        ('type:' type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('apikey:' apikey=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('exchange:' exchange=STRING)
+        ('queue:' queue=STRING)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'device' | 'virtual'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+TriggerEvent:
+    'property_change' | 'timer' | 'external_event' | 'manual'
+;
+
+BehaviorAction:
+    'set_property' | 'send_message' | 'execute_command' | 'notify'
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('action:' action=BehaviorAction)
+        ('condition:' condition=Condition)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[Broker])
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ChangeType:
+    'any' | 'increase' | 'decrease' | 'equals' | 'not_equals' | 'greater' | 'less'
+;
+
+EntityTrigger:
+    'entity:' entity=[Entity] 'property:' property=ID 'change:' change=ChangeType
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+CronExpression:
+    'cron:' expression=STRING
+;
+
+IntervalExpression:
+    'interval:' value=INT unit=TimeUnit
+;
+
+FixedTimeExpression:
+    'at:' time=STRING
+;
+
+TimeExpression:
+    CronExpression | IntervalExpression | FixedTimeExpression
+;
+
+TimeTrigger:
+    'time:' time=TimeExpression
+;
+
+EventSource:
+    'broker' | 'external' | 'system' | 'user'
+;
+
+EventTrigger:
+    'event:' event=STRING 'source:' source=EventSource
+;
+
+AutomationTrigger:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+ExecutionMode:
+    'immediate' | 'queued' | 'delayed' | 'scheduled'
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+VariableRef:
+    variable=ID
+;
+
+ConditionOperand:
+    EntityPropertyRef | LiteralValue | VariableRef
+;
+
+ConditionOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    operand1=ConditionOperand operator=ConditionOperator operand2=ConditionOperand
+;
+
+Condition:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+NotificationMethod:
+    'email' | 'sms' | 'push' | 'webhook'
+;
+
+FunctionCall:
+    function=ID '(' parameters*=ActionValue[','] ')'
+;
+
+ActionValue:
+    STRING | FLOAT | INT | BOOL | EntityPropertyRef | VariableRef | FunctionCall
+;
+
+SetPropertyAction:
+    'SetProperty' entity=[Entity] '.' property=ID '=' value=ActionValue
+;
+
+SendMessageAction:
+    'SendMessage' 
+    (
+        ('broker:' broker=[Broker])
+        ('topic:' topic=STRING)
+        ('message:' message=ActionValue)
+    )#
+;
+
+ExecuteCommandAction:
+    'ExecuteCommand'
+    (
+        ('command:' command=STRING)
+        ('parameters:' parameters=STRING)?
+        ('timeout:' timeout=INT)?
+    )#
+;
+
+NotifyAction:
+    'Notify'
+    (
+        ('recipient:' recipient=STRING)
+        ('message:' message=ActionValue)
+        ('method:' method=NotificationMethod)
+    )#
+;
+
+DelayAction:
+    'Delay' duration=INT unit=TimeUnit
+;
+
+Action:
+    SetPropertyAction | SendMessageAction | ExecuteCommandAction | NotifyAction | DelayAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])
+        ('execution:' execution=ExecutionMode)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;

@@ -1,0 +1,347 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth=AuthenticationConfig?
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+QoSLevel:
+    '0' | '1' | '2'
+;
+
+AuthMethod:
+    'basic' | 'token' | 'certificate' | 'oauth'
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationMethod:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+AuthCredentials:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=QoSLevel)?
+        ('auth:' auth=AuthenticationMethod)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationMethod)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationMethod)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+AuthenticationConfig:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=AuthCredentials)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+PropertyDef:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+BehaviorType:
+    'readonly' | 'writable' | 'command' | 'event'
+;
+
+BehaviorDef:
+    name=ID ':' behavior=BehaviorType
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+RetryConfig:
+    'RetryConfig'
+    (
+        ('attempts:' attempts=INT)
+        ('interval:' interval=INT)
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('retry:' retry=RetryConfig)?
+    )#
+    'end'
+;
+
+TimeConditionType:
+    'absolute' | 'relative' | 'periodic' | 'duration'
+;
+
+TIME:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+DATE:
+    year=INT '-' month=INT '-' day=INT
+;
+
+TimeValue:
+    TIME | DATE | STRING | INT
+;
+
+TimeCondition:
+    'TimeCondition'
+    (
+        ('type:' type=TimeConditionType)
+        ('value:' value=TimeValue)
+        ('operator:' operator=ComparisonOperator)?
+    )#
+;
+
+EntityCondition:
+    'EntityCondition'
+    (
+        ('entity:' entity=[EntityDef])
+        ('property:' property=ID)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=ConditionValue)
+    )#
+;
+
+ValueCondition:
+    'ValueCondition'
+    (
+        ('left:' left=ConditionValue)
+        ('operator:' operator=ComparisonOperator)
+        ('right:' right=ConditionValue)
+    )#
+;
+
+StateCondition:
+    'StateCondition'
+    (
+        ('entity:' entity=[EntityDef])
+        ('state:' state=STRING)
+        ('duration:' duration=INT)?
+    )#
+;
+
+EntityPropertyRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+VariableRef:
+    '$' name=ID
+;
+
+ConditionValue:
+    PropertyValue | EntityPropertyRef | VariableRef
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+PrimitiveCondition:
+    TimeCondition | EntityCondition | ValueCondition | StateCondition
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+ConditionGroup:
+    '(' condition=Condition ')' | condition=Condition
+;
+
+EntityOperation:
+    'set' | 'get' | 'toggle' | 'execute' | 'subscribe' | 'unsubscribe'
+;
+
+ActionParam:
+    name=ID ':' value=ConditionValue
+;
+
+ActionParameters:
+    '{' params*=ActionParam[','] '}'
+;
+
+EntityAction:
+    'EntityAction'
+    (
+        ('entity:' entity=[EntityDef])
+        ('operation:' operation=EntityOperation)
+        ('parameters:' parameters=ActionParameters)?
+    )#
+;
+
+NotificationType:
+    'email' | 'sms' | 'push' | 'webhook' | 'mqtt'
+;
+
+NotificationAction:
+    'NotificationAction'
+    (
+        ('type:' type=NotificationType)
+        ('message:' message=STRING)
+        ('target:' target=STRING)?
+    )#
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+VariableOperation:
+    'set' | 'increment' | 'decrement' | 'clear'
+;
+
+VariableAction:
+    'VariableAction'
+    (
+        ('variable:' variable=STRING)
+        ('operation:' operation=VariableOperation)
+        ('value:' value=ConditionValue)?
+    )#
+;
+
+ActionDef:
+    EntityAction | NotificationAction | DelayAction | VariableAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' conditions=ConditionGroup)
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

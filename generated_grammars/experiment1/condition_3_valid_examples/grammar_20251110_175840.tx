@@ -1,0 +1,224 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=BrokerConfiguration
+        authentication*=AuthenticationConfig
+        entities*=EntityDefinition
+        automations*=AutomationDeclaration
+    )#
+;
+
+TokenType:
+    'Bearer' | 'Basic' | 'APIKey'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'device' | 'virtual'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+VALUE:
+    FLOAT | INT | STRING | BOOL
+;
+
+TriggerEvent:
+    'onchange' | 'onvalue' | 'ontimer' | 'onevent'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+SystemMetadata:
+    'SystemMetadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfiguration:
+    MQTTBroker | HTTPBroker | AMQPBroker
+;
+
+MQTTBroker:
+    'MQTTBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'HTTPBroker' name=ID
+    (
+        ('baseurl:' baseurl=STRING)
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'AMQPBroker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('auth:' auth=[AuthenticationConfig])?
+    )#
+    'end'
+;
+
+AuthenticationConfig:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'BasicAuth' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'CertificateAuth' name=ID
+    (
+        ('certfile:' certfile=STRING)
+        ('keyfile:' keyfile=STRING)
+        ('cafile:' cafile=STRING)?
+    )#
+    'end'
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('properties:' properties*=PropertyDefinition)
+        ('behaviors:' behaviors*=BehaviorDefinition)
+        ('broker:' broker=[BrokerConfiguration])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+PropertyDefinition:
+    name=ID ':' datatype=DataType ('=' defaultvalue=VALUE)?
+;
+
+BehaviorDefinition:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('actions:' actions*=ActionDefinition)
+    )#
+    'end'
+;
+
+AutomationDeclaration:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions*=ConditionSpec)
+        ('actions:' actions*=ActionDefinition)
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+ConditionSpec:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | '(' condition=ConditionSpec ')'
+;
+
+ComparisonCondition:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+ValueExpression:
+    PropertyReference | VALUE | FunctionCall
+;
+
+PropertyReference:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+FunctionCall:
+    name=ID '(' args*=VALUE[','] ')'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+ActionDefinition:
+    SetAction | CallAction | NotifyAction
+;
+
+SetAction:
+    'set' target=PropertyReference 'to' value=ValueExpression
+;
+
+CallAction:
+    'call' service=ServiceCall
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' recipient=STRING)?
+;
+
+ServiceCall:
+    name=ID '(' params*=Parameter[','] ')'
+;
+
+Parameter:
+    name=ID '=' value=ValueExpression
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('delay:' delay=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;

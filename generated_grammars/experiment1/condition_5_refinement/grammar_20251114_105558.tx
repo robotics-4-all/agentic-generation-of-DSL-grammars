@@ -1,0 +1,304 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=Broker
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+ImportStm:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BasicAuth:
+    'BasicAuth'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'TokenAuth'
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'CertAuth'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+Property:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+Coordinates:
+    'Coordinates' '(' x=FLOAT ',' y=FLOAT (',' z=FLOAT)? ')'
+;
+
+Location:
+    'Location'
+    (
+        ('room:' room=STRING)
+        ('floor:' floor=STRING)?
+        ('building:' building=STRING)?
+        ('coordinates:' coordinates=Coordinates)?
+    )#
+    'end'
+;
+
+TriggerEvent:
+    PropertyChange | TimeEvent | ExternalEvent
+;
+
+PropertyChange:
+    'PropertyChange'
+    (
+        ('property:' property=ID)
+        ('condition:' condition=Condition)
+    )#
+;
+
+TimeEvent:
+    'TimeEvent'
+    (
+        ('schedule:' schedule=STRING)
+        ('interval:' interval=INT)?
+    )#
+;
+
+ExternalEvent:
+    'ExternalEvent'
+    (
+        ('topic:' topic=STRING)
+        ('condition:' condition=Condition)?
+    )#
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerEvent)
+        ('actions:' '-' actions*=Action['-'])
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=Location)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('priority:' priority=INT)?
+        ('delay:' delay=INT)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+PropertyReference:
+    entity=ID '.' property=ID
+;
+
+ConstantValue:
+    value=PropertyValue
+;
+
+FunctionCall:
+    function=ID '(' args*=ConditionOperand[','] ')'
+;
+
+ConditionOperand:
+    PropertyReference | ConstantValue | FunctionCall
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+ComparisonCondition:
+    left=ConditionOperand operator=ComparisonOperator right=ConditionOperand
+;
+
+ExistenceCondition:
+    'exists' '(' operand=ConditionOperand ')'
+;
+
+PrimitiveCondition:
+    ComparisonCondition | ExistenceCondition | ('(' condition=Condition ')')
+;
+
+Condition:
+    left=PrimitiveCondition (operator=LogicalOperator right=Condition)?
+;
+
+PropertyOperation:
+    'set' | 'increment' | 'decrement' | 'toggle'
+;
+
+PropertyAction:
+    'PropertyAction'
+    (
+        ('target:' target=PropertyReference)
+        ('operation:' operation=PropertyOperation)
+        ('value:' value=ConditionOperand)
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderItem:
+    name=STRING ':' value=STRING
+;
+
+ServiceAction:
+    'ServiceAction'
+    (
+        ('service:' service=STRING)
+        ('method:' method=HTTPMethod)
+        ('url:' url=STRING)
+        ('headers:' '-' headers*=HeaderItem['-'])?
+        ('body:' body=ConditionOperand)?
+    )#
+;
+
+MessageAction:
+    'MessageAction'
+    (
+        ('broker:' broker=ID)
+        ('topic:' topic=STRING)
+        ('message:' message=ConditionOperand)
+        ('qos:' qos=INT)?
+        ('retain:' retain=BOOL)?
+    )#
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+DelayAction:
+    'DelayAction'
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+;
+
+Action:
+    PropertyAction | MessageAction | ServiceAction | DelayAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=Action['-'])?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;

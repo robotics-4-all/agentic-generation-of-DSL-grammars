@@ -1,0 +1,377 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=MessageBroker)*
+    (authentications*=Authentication)*
+    (entities*=Entity)*
+    (automations*=Automation)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=QoSLevel)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+QoSLevel:
+    'QoS0' | 'QoS1' | 'QoS2'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+TokenType:
+    'Bearer' | 'API' | 'JWT'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=Location)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('data_type:' data_type=DataType)
+        ('unit:' unit=STRING)?
+        ('range:' range=ValueRange)?
+        ('default:' default_value=PropertyValue)?
+        ('readonly:' readonly=BOOL)?
+    )#
+    'end'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json' | 'binary'
+;
+
+ValueRange:
+    'Range' '(' min=NUMBER ',' max=NUMBER ')'
+;
+
+PropertyValue:
+    NUMBER | STRING | BOOL
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('actions:' '-' actions*=BehaviorAction['-'])
+        ('conditions:' '-' conditions*=Condition['-'])?
+    )#
+    'end'
+;
+
+BehaviorTrigger:
+    'on_property_change' | 'on_message' | 'on_schedule' | 'on_event'
+;
+
+BehaviorAction:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=STRING)
+        ('payload:' payload=STRING)?
+        ('delay:' delay=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'publish' | 'set_property' | 'send_command' | 'log' | 'alert'
+;
+
+Location:
+    'Location'
+    (
+        ('room:' room=STRING)?
+        ('floor:' floor=STRING)?
+        ('building:' building=STRING)?
+        ('coordinates:' coordinates=Coordinates)?
+    )#
+    'end'
+;
+
+Coordinates:
+    'Coordinates' '(' x=NUMBER ',' y=NUMBER (',' z=NUMBER)? ')'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=Condition['-'])?
+        ('actions:' '-' actions*=AutomationAction['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EntityTrigger | ManualTrigger
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=Schedule)
+        ('timezone:' timezone=STRING)?
+    )#
+    'end'
+;
+
+EntityTrigger:
+    'EntityTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=[Property])
+        ('event:' event=TriggerEvent)
+    )#
+    'end'
+;
+
+ManualTrigger:
+    'ManualTrigger'
+    (
+        ('name:' trigger_name=STRING)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+TriggerEvent:
+    'value_change' | 'threshold_exceeded' | 'connection_lost' | 'error_occurred'
+;
+
+Schedule:
+    CronSchedule | IntervalSchedule | TimeSchedule
+;
+
+CronSchedule:
+    'Cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'Interval' '(' seconds=INT ')'
+;
+
+TimeSchedule:
+    'Time' '(' time=TIME (',' days*=DayOfWeek[','])? ')'
+;
+
+TIME:
+    /([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/
+;
+
+DayOfWeek:
+    'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
+;
+
+Condition:
+    SimpleCondition | CompoundCondition
+;
+
+SimpleCondition:
+    'Condition' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=[Property])
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=ConditionValue)
+    )#
+    'end'
+;
+
+CompoundCondition:
+    'CompoundCondition' name=ID
+    (
+        ('left:' left=[Condition])
+        ('operator:' logical_operator=LogicalOperator)
+        ('right:' right=[Condition])
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    'equals' | 'not_equals' | 'greater_than' | 'less_than' | 'greater_equal' | 'less_equal' | 'contains'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ConditionValue:
+    NUMBER | STRING | BOOL | PropertyReference
+;
+
+PropertyReference:
+    'PropertyRef' '(' entity=[Entity] ',' property=[Property] ')'
+;
+
+AutomationAction:
+    EntityAction | NotificationAction | SystemAction
+;
+
+EntityAction:
+    'EntityAction' name=ID
+    (
+        ('entity:' target_entity=[Entity])
+        ('property:' target_property=[Property])
+        ('value:' action_value=PropertyValue)
+        ('method:' method=ActionMethod)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'NotificationAction' name=ID
+    (
+        ('message:' message=STRING)
+        ('recipients:' '-' recipients*=STRING['-'])
+        ('channel:' channel=NotificationChannel)?
+        ('priority:' priority=NotificationPriority)?
+    )#
+    'end'
+;
+
+SystemAction:
+    'SystemAction' name=ID
+    (
+        ('command:' command=STRING)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ActionMethod:
+    'set' | 'increment' | 'decrement' | 'toggle'
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'critical'
+;
+
+ActionParameter:
+    'Parameter' name=ID
+    (
+        ('value:' param_value=STRING)
+        ('type:' param_type=DataType)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('max_executions:' max_executions=INT)?
+        ('cooldown:' cooldown=INT)?
+        ('retry_count:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+        ('mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;

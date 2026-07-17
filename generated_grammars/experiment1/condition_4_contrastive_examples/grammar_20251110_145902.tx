@@ -1,0 +1,251 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        auth_configs*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+        conditions*=ConditionDef
+        actions*=ActionDef
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'object' | 'array'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'error' | 'maintenance'
+;
+
+BehaviorType:
+    'read' | 'write' | 'notify' | 'execute' | 'schedule'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'once' | 'repeat'
+;
+
+LogicalOp:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOp:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ActionType:
+    'control' | 'notify' | 'log' | 'execute' | 'update'
+;
+
+LiteralValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+PropertyRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+FunctionCall:
+    function_name=ID '(' args*=ValueExpr[','] ')'
+;
+
+ValueExpr:
+    LiteralValue | PropertyRef | FunctionCall
+;
+
+ParameterDef:
+    name=ID ':' param_type=DataType
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=ValueExpr)?
+;
+
+BehaviorDef:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters*=ParameterDef[','] ')')?
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('queue:' queue=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('channel:' channel=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'event' ':' event_source=[EntityDef] ('.' event_type=ID)?
+;
+
+ScheduleTrigger:
+    'schedule' ':' schedule_expr=STRING
+;
+
+StateTrigger:
+    'state' ':' entity=[EntityDef] '.' property=ID operator=ComparisonOp value=ValueExpr
+;
+
+TriggerDef:
+    EventTrigger | ScheduleTrigger | StateTrigger
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=[ConditionDef]['-'])?
+        ('actions:' '-' actions*=[ActionDef]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOp value=ValueExpr
+;
+
+ConditionExpr:
+    left=SimpleCondition (logical_op=LogicalOp right=SimpleCondition)*
+;
+
+ConditionDef:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpr)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+ParameterValue:
+    name=ID '=' value=ValueExpr
+;
+
+SetOperation:
+    'set' property=ID '=' value=ValueExpr
+;
+
+CallOperation:
+    'call' method=ID ('(' params*=ParameterValue[','] ')')?
+;
+
+SendOperation:
+    'send' message=ValueExpr ('to' destination=STRING)?
+;
+
+OperationDef:
+    SetOperation | CallOperation | SendOperation
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[EntityDef])?
+        ('operation:' operation=OperationDef)
+        ('retry:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;

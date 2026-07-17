@@ -1,0 +1,215 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerDeclaration
+        authentication*=AuthenticationDeclaration
+        entities*=EntityDeclaration
+        automations*=AutomationDeclaration
+    )#
+;
+
+Metadata:
+    'metadata' '{'
+        (
+            ('name:' name=STRING)?
+            ('version:' version=STRING)?
+            ('description:' description=STRING)?
+            ('author:' author=STRING)?
+            ('timestamp:' timestamp=STRING)?
+        )#
+    '}'
+;
+
+BrokerType:
+    'mqtt' | 'amqp' | 'redis' | 'kafka'
+;
+
+BrokerDeclaration:
+    'broker' name=ID '{'
+        (
+            ('type:' broker_type=BrokerType)
+            ('host:' host=STRING)
+            ('port:' port=INT)
+            ('ssl:' ssl=BOOL)?
+            ('topic:' topic=STRING)?
+            ('auth:' auth=[AuthenticationDeclaration])?
+        )#
+    '}'
+;
+
+PlainAuth:
+    'plain' '{'
+        (
+            ('username:' username=STRING)
+            ('password:' password=STRING)
+        )#
+    '}'
+;
+
+ApiKeyAuth:
+    'apikey' '{'
+        'key:' key=STRING
+    '}'
+;
+
+CertAuth:
+    'certificate' '{'
+        ('cert:' cert=STRING | 'cert_path:' cert_path=STRING)
+    '}'
+;
+
+AuthMechanism:
+    PlainAuth | ApiKeyAuth | CertAuth
+;
+
+AuthenticationDeclaration:
+    'auth' name=ID '{'
+        mechanism=AuthMechanism
+    '}'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'virtual' | 'hybrid'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+PropertyDeclaration:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+TriggerCondition:
+    'property_change' | 'time_based' | 'external_event' | 'condition_met'
+;
+
+ActionDefinition:
+    'set_property' | 'send_message' | 'trigger_automation' | 'log_event'
+;
+
+BehaviorDeclaration:
+    name=ID '{'
+        (
+            ('trigger:' trigger=TriggerCondition)
+            ('action:' action=ActionDefinition)
+        )#
+    '}'
+;
+
+EntityDeclaration:
+    'entity' name=ID '{'
+        (
+            ('type:' entity_type=EntityType)
+            ('properties:' '{' properties*=PropertyDeclaration '}' )?
+            ('behaviors:' '{' behaviors*=BehaviorDeclaration '}' )?
+            ('source:' source=[BrokerDeclaration])?
+            ('topic:' topic=STRING)?
+        )#
+    '}'
+;
+
+AutomationTrigger:
+    'entity_change' | 'time_schedule' | 'manual' | 'system_event'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+PropertyCondition:
+    entity=[EntityDeclaration] '.' property=ID comparison=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparison=ComparisonOperator time_value=STRING
+;
+
+ValueCondition:
+    left_value=PropertyValue comparison=ComparisonOperator right_value=PropertyValue
+;
+
+ConditionTerm:
+    PropertyCondition | TimeCondition | ValueCondition | '(' ConditionExpression ')'
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+ConditionGroup:
+    '{' conditions*=ConditionExpression '}'
+;
+
+LogLevel:
+    'info' | 'warning' | 'error' | 'debug'
+;
+
+SetPropertyAction:
+    'set' entity=[EntityDeclaration] '.' property=ID '=' value=PropertyValue
+;
+
+SendMessageAction:
+    'send' message=STRING 'to' target=STRING
+;
+
+TriggerEntityAction:
+    'trigger' entity=[EntityDeclaration] '.' behavior=ID
+;
+
+LogAction:
+    'log' message=STRING ('level:' level=LogLevel)?
+;
+
+AutomationAction:
+    SetPropertyAction | SendMessageAction | TriggerEntityAction | LogAction
+;
+
+ExecutionMode:
+    'immediate' | 'delayed' | 'scheduled' | 'conditional'
+;
+
+RepeatConfig:
+    'once' | 'continuous' | 'count:' count=INT | 'interval:' interval=INT
+;
+
+ExecutionControl:
+    '{'
+        (
+            ('mode:' mode=ExecutionMode)?
+            ('delay:' delay=INT)?
+            ('repeat:' repeat=RepeatConfig)?
+        )#
+    '}'
+;
+
+AutomationDeclaration:
+    'automation' name=ID '{'
+        (
+            ('trigger:' trigger=AutomationTrigger)
+            ('conditions:' conditions=ConditionGroup)?
+            ('actions:' '{' actions*=AutomationAction '}')
+            ('execution:' execution=ExecutionControl)?
+        )#
+    '}'
+;

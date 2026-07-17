@@ -1,0 +1,287 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata' name=ID
+    (
+        ('version:' version=STRING)?
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('port:' port=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertificateAuth | ApiKeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'hybrid'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('data_type:' data_type=DataType)
+        ('unit:' unit=STRING)?
+        ('min_value:' min_value=NUMBER)?
+        ('max_value:' max_value=NUMBER)?
+        ('default_value:' default_value=PropertyValue)?
+        ('readonly:' readonly=BOOL)?
+    )#
+    'end'
+;
+
+DataType:
+    'int' | 'float' | 'bool' | 'string' | 'array' | 'object'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('parameters:' '-' parameters*=BehaviorParameter['-'])?
+        ('response_topic:' response_topic=STRING)?
+    )#
+    'end'
+;
+
+BehaviorTrigger:
+    'command' | 'query' | 'event' | 'schedule'
+;
+
+BehaviorParameter:
+    'Parameter' name=ID
+    (
+        ('type:' param_type=DataType)
+        ('required:' required=BOOL)?
+        ('default:' default_value=PropertyValue)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('conditions:' conditions=ConditionExpression)
+        ('actions:' '-' actions*=Action['-'])
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('retry_count:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+        ('schedule:' schedule=STRING)?
+    )#
+;
+
+ExecutionMode:
+    'immediate' | 'scheduled' | 'delayed' | 'retry_on_fail'
+;
+
+ConditionExpression:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    SimpleCondition | CompoundCondition
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID comparison_operator=ComparisonOperator value=PropertyValue
+;
+
+CompoundCondition:
+    '(' expression=ConditionExpression ')'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+EntityAction:
+    'EntityAction' name=ID
+    (
+        ('target:' target=[Entity])
+        ('behavior:' behavior=[Behavior])
+        ('parameters:' parameters=ActionParameters)?
+    )#
+;
+
+NotificationAction:
+    'NotificationAction' name=ID
+    (
+        ('message:' message=STRING)
+        ('recipients:' recipients=STRING)
+        ('channel:' channel=NotificationChannel)
+    )#
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'mqtt' | 'webhook'
+;
+
+DelayAction:
+    'DelayAction' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' time_unit=TimeUnit)
+    )#
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ScriptAction:
+    'ScriptAction' name=ID
+    (
+        ('language:' language=ScriptLanguage)
+        ('script:' script=STRING)
+        ('parameters:' parameters=ActionParameters)?
+    )#
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash' | 'lua'
+;
+
+ActionParameters:
+    '{' items*=ParameterItem[','] '}'
+;
+
+ParameterItem:
+    name=ID ':' value=ParameterValue
+;
+
+ParameterValue:
+    FLOAT | INT | BOOL | STRING | entity_ref=EntityReference
+;
+
+EntityReference:
+    entity=[Entity] ('.' property=ID)?
+;

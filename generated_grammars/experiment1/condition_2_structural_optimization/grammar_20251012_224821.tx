@@ -1,0 +1,322 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+TopicConfig:
+    name=STRING ':' qos=INT
+;
+
+QueueConfig:
+    name=STRING ':' durable=BOOL
+;
+
+EndpointConfig:
+    path=STRING ':' method=HTTPMethod
+;
+
+APIKeyLocation:
+    'header' | 'query' | 'cookie'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+        ('header:' headerName=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)
+        ('passphrase:' passphrase=STRING)?
+    )#
+    'end'
+;
+
+APIKeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('location:' location=APIKeyLocation)
+        ('paramName:' paramName=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth | APIKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('clientId:' clientId=STRING)?
+        ('keepAlive:' keepAlive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('topics:' '-' topics*=TopicConfig['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+        ('queues:' '-' queues*=QueueConfig['-'])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('auth:' auth=[Authentication])?
+        ('endpoints:' '-' endpoints*=EndpointConfig['-'])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'virtual'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+ArrayValue:
+    '[' values*=PropertyValue[','] ']'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL | ArrayValue | ObjectValue
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+ActionParameter:
+    name=ID ':' value=PropertyValue
+;
+
+StateProperty:
+    name=ID ':' value=PropertyValue
+;
+
+EntityState:
+    'state' '{' stateProperties*=StateProperty[','] '}'
+;
+
+Behavior:
+    name=ID ':' actionRef=[Action] ('when' triggerCondition=[Condition])?
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[BrokerConfig])?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('state:' initialState=EntityState)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'event' ':' eventSource=STRING
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+TimeOfDay:
+    'at' '(' time=STRING ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | TimeOfDay
+;
+
+TimeTrigger:
+    'time' ':' schedule=TimeSchedule
+;
+
+StateTrigger:
+    'state' ':' entityRef=[Entity] '.' propertyName=ID
+;
+
+AutomationTrigger:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+AutomationMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('mode:' mode=AutomationMode)?
+    )#
+    'end'
+;
+
+EntityReference:
+    entity=[Entity] '.' property=ID
+;
+
+ConditionValue:
+    literal=PropertyValue | reference=EntityReference
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ComparisonExpression:
+    left=EntityReference operator=ComparisonOperator right=ConditionValue
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+ConditionExpression:
+    logicalExpr=LogicalExpression
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+    )#
+    'end'
+;
+
+ActionType:
+    'setValue' | 'sendMessage' | 'callService' | 'delay' | 'notify' | 'script'
+;
+
+EntityTarget:
+    'entity' ':' entity=[Entity] ('.' property=ID)?
+;
+
+ServiceTarget:
+    'service' ':' serviceName=STRING
+;
+
+BrokerTarget:
+    'broker' ':' broker=[BrokerConfig] ('/' topic=STRING)?
+;
+
+ActionTarget:
+    EntityTarget | ServiceTarget | BrokerTarget
+;
+
+RetryConfig:
+    'retry' '(' attempts=INT (',' delay=INT)? ')'
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('target:' target=ActionTarget)?
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('async:' async=BOOL)?
+        ('retry:' retryConfig=RetryConfig)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

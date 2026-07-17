@@ -1,0 +1,270 @@
+SmartEnvironmentModel:
+    (
+        metadata=SystemMetadata?
+        brokers*=MessageBroker
+        authentication*=AuthenticationMechanism
+        entities*=SmartEntity
+        automations*=AutomationRule
+    )#
+;
+
+SystemMetadata:
+    'System' name=ID
+    (
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'maintenance' | 'error'
+;
+
+PropertyDataType:
+    'int' | 'float' | 'str' | 'bool' | 'timestamp'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+EntityProperty:
+    name=ID ':' data_type=PropertyDataType ('=' default_value=PropertyValue)?
+;
+
+BehaviorTrigger:
+    'periodic' | 'event_driven' | 'threshold' | 'manual'
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'update' | 'alert' | 'execute'
+;
+
+EntityBehavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('action:' action=BehaviorAction)
+        ('frequency:' frequency=INT)?
+    )#
+    'end'
+;
+
+MQTTQoS:
+    '0' | '1' | '2'
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+AuthenticationMechanism:
+    BasicAuth | TokenAuth | CertificateAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=MQTTQoS)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[AuthenticationMechanism])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+SmartEntity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])?
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+EntityPropertyRef:
+    entity=[SmartEntity] '.' property=ID
+;
+
+ConstantValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+ConditionOperand:
+    EntityPropertyRef | ConstantValue
+;
+
+PrimitiveCondition:
+    left_operand=ConditionOperand operator=ComparisonOperator right_operand=ConditionOperand
+;
+
+ConditionGroup:
+    '(' expr=ConditionExpression ')' | primitive_condition=PrimitiveCondition
+;
+
+ConditionExpression:
+    condition_groups+=ConditionGroup (logical_ops+=LogicalOperator condition_groups+=ConditionGroup)*
+;
+
+NotificationLevel:
+    'info' | 'warning' | 'error' | 'critical'
+;
+
+SimplePayload:
+    PropertyValue
+;
+
+StructuredPayload:
+    '{' payload_items*=PayloadItem[','] '}'
+;
+
+PayloadValue:
+    PropertyValue | EntityPropertyRef | StructuredPayload
+;
+
+PayloadItem:
+    key=STRING ':' value=PayloadValue
+;
+
+ActionPayload:
+    SimplePayload | StructuredPayload
+;
+
+PublishAction:
+    'Publish' '(' 
+        ('topic:' topic=STRING)
+        ('payload:' payload=ActionPayload)
+        ('broker:' broker=[MessageBroker])?
+    ')' 
+;
+
+CallAction:
+    'Call' '('
+        ('service:' service=STRING)
+        ('method:' method=STRING)
+        ('params:' params=ActionPayload)?
+    ')'
+;
+
+SetPropertyAction:
+    'SetProperty' '('
+        ('entity:' entity=[SmartEntity])
+        ('property:' property=ID)
+        ('value:' value=PropertyValue)
+    ')'
+;
+
+NotificationAction:
+    'Notify' '('
+        ('message:' message=STRING)
+        ('level:' level=NotificationLevel)?
+        ('recipients:' recipients=STRING)?
+    ')'
+;
+
+AutomationAction:
+    PublishAction | CallAction | SetPropertyAction | NotificationAction
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+ScheduleConfig:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+AutomationRule:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions=ConditionExpression)
+        ('actions:' '-' actions*=AutomationAction['-'])
+        ('schedule:' schedule=ScheduleConfig)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;

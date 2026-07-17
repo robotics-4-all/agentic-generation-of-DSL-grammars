@@ -1,0 +1,362 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentications*=Authentication
+        entities*=Entity
+        conditions*=Condition
+        actions*=Action
+        automations*=Automation
+    )#
+;
+
+TokenType:
+    'Bearer' | 'API' | 'JWT'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway'
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+BehaviorTrigger:
+    'event' | 'periodic' | 'condition' | 'manual'
+;
+
+DataType:
+    'int' | 'float' | 'string' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    NUMBER | STRING | BOOL
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'immediate' | 'queued'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+DeviceOperation:
+    'turn_on' | 'turn_off' | 'set_value' | 'toggle' | 'reset' | 'calibrate'
+;
+
+NotificationChannel:
+    'email' | 'sms' | 'push' | 'webhook' | 'mqtt'
+;
+
+NotificationPriority:
+    'low' | 'normal' | 'high' | 'urgent'
+;
+
+DataOperation:
+    'store' | 'retrieve' | 'delete' | 'update' | 'backup'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+MathOperator:
+    '+' | '-' | '*' | '/' | '%' | '^'
+;
+
+Location:
+    'Location' '(' x=NUMBER ',' y=NUMBER (',' z=NUMBER)? ')'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+LiteralValue:
+    NUMBER | STRING | BOOL
+;
+
+ValueExpression:
+    PropertyReference | LiteralValue
+;
+
+ComparisonExpression:
+    left=ValueExpression operator=ComparisonOperator right=ValueExpression
+    | '(' expression=LogicalExpression ')'
+;
+
+LogicalExpression:
+    left=ComparisonExpression (operator=LogicalOperator right=ComparisonExpression)*
+;
+
+MathTerm:
+    PropertyReference | NUMBER | '(' expression=MathExpression ')'
+;
+
+MathExpression:
+    left=MathTerm (operator=MathOperator right=MathTerm)*
+;
+
+CalculatedValue:
+    'calc' '(' expression=MathExpression ')'
+;
+
+ParameterValue:
+    PropertyReference | LiteralValue | CalculatedValue
+;
+
+HTTPHeader:
+    'Header' name=STRING ':' value=STRING
+;
+
+JSONPayload:
+    'json' '(' content=STRING ')'
+;
+
+XMLPayload:
+    'xml' '(' content=STRING ')'
+;
+
+TextPayload:
+    'text' '(' content=STRING ')'
+;
+
+DataPayload:
+    JSONPayload | XMLPayload | TextPayload
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=NUMBER ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule
+;
+
+EventTrigger:
+    'Event' '(' entity=[Entity] ',' event=STRING ')'
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+ConditionTrigger:
+    'Condition' '(' condition=[Condition] ')'
+;
+
+AutomationTrigger:
+    EventTrigger | TimeTrigger | ConditionTrigger
+;
+
+Property:
+    'Property' name=ID
+    (
+        ('datatype:' datatype=DataType)
+        ('unit:' unit=STRING)?
+        ('range:' '[' min=NUMBER ',' max=NUMBER ']')?
+        ('readonly:' readonly=BOOL)?
+        ('default:' default=PropertyValue)?
+    )#
+    'end'
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('frequency:' frequency=NUMBER)?
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+ActionParameter:
+    'Parameter' name=ID
+    (
+        ('value:' value=ParameterValue)
+        ('type:' type=DataType)?
+    )#
+    'end'
+;
+
+DeviceAction:
+    'Action<Device>' name=ID
+    (
+        ('target:' target=[Entity])
+        ('operation:' operation=DeviceOperation)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('timeout:' timeout=NUMBER)?
+        ('retry:' retry=INT)?
+    )#
+    'end'
+;
+
+NotificationAction:
+    'Action<Notification>' name=ID
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=NotificationChannel)
+        ('priority:' priority=NotificationPriority)?
+        ('recipients:' '-' recipients*=STRING['-'])?
+    )#
+    'end'
+;
+
+DataAction:
+    'Action<Data>' name=ID
+    (
+        ('operation:' operation=DataOperation)
+        ('target:' target=STRING)
+        ('data:' data=DataPayload)?
+    )#
+    'end'
+;
+
+ExternalAction:
+    'Action<External>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' '-' headers*=HTTPHeader['-'])?
+        ('payload:' payload=DataPayload)?
+    )#
+    'end'
+;
+
+Action:
+    DeviceAction | NotificationAction | DataAction | ExternalAction
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=TokenType)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)
+        ('ca:' ca=STRING)?
+    )#
+    'end'
+;
+
+Authentication:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+        ('location:' location=Location)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('timeout:' timeout=NUMBER)?
+        ('persistent:' persistent=BOOL)?
+    )#
+    'end'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionMode)?
+    )#
+    'end'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;

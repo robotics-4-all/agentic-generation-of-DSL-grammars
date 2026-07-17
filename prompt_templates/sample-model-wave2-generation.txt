@@ -1,0 +1,153 @@
+WAVE 2: Medium Complexity Sample Model Generation (Building Layer)
+==================================================================
+
+Task:
+You are an expert in Domain-Specific Languages (DSLs) and textX grammar. Your task is to generate MEDIUM COMPLEXITY sample models that combine 2-3 requirements together to demonstrate integrated functionality.
+
+This is WAVE 2 of a pyramid generation process - build upon the simple Wave 1 models by creating more realistic combinations.
+
+EXAMPLE: Calculator DSL Wave 2
+================================
+
+Example Requirements:
+R1 - The grammar should support variable declarations with numeric types.
+R2 - The grammar should support basic arithmetic operations (add, subtract, multiply, divide).
+R3 - The grammar should support function definitions with parameters.
+R4 - The grammar should support conditional expressions (if-then-else).
+R5 - The grammar should support loops with iteration control.
+
+Example Grammar:
+```
+Program: statements*=Statement;
+
+Statement:
+    VariableDeclaration | Assignment | FunctionDef | IfStatement | Loop | Expression
+;
+
+VariableDeclaration:
+    'var' name=ID ':' type=Type '=' value=Expression
+;
+
+Type: 'int' | 'float';
+
+FunctionDef:
+    'function' name=ID '(' params*=Parameter[','] ')' ':' type=Type
+    'begin'
+        body*=Statement
+    'end'
+;
+
+IfStatement:
+    'if' condition=Expression 'then'
+        then_body*=Statement
+    ('else'
+        else_body*=Statement)?
+    'endif'
+;
+
+Loop:
+    'for' var=ID 'in' start=Expression 'to' end=Expression
+        body*=Statement
+    'endfor'
+;
+
+Expression: Arithmetic | ID | NUMBER;
+Arithmetic: left=Operand op=Operator right=Operand;
+Operand: NUMBER | ID;
+Operator: '+' | '-' | '*' | '/';
+```
+
+Wave 1 Models (for reference - these were the simple models):
+```
+--- Wave 1 Model 1 (R1) ---
+var x : int = 10
+
+--- Wave 1 Model 2 (R2) ---
+var result : int = 5 + 3
+
+--- Wave 1 Model 3 (R3) ---
+function calc : int
+begin
+    var temp : int = 5
+end
+```
+
+Example Wave 2 Models (COMBINE 2-3 requirements):
+
+Model 1 (R1 + R2 + R4 - Variables, Arithmetic, Conditionals):
+```
+var x : int = 10
+var y : int = 20
+var sum : int = x + y
+if sum then
+    var result : int = sum * 2
+else
+    var result : int = 0
+endif
+```
+
+Model 2 (R3 + R2 + R5 - Functions, Arithmetic, Loops):
+```
+function processData : int
+begin
+    var total : int = 0
+    for i in 1 to 10
+        var temp : int = i * 2
+    endfor
+end
+```
+
+Notice: Wave 2 models combine multiple requirements and are more realistic/complex than Wave 1.
+
+========================
+END OF EXAMPLE
+========================
+
+YOUR TASK:
+==========
+
+The grammar you need to generate sample models for was created to satisfy the following requirements:
+{{REQUIREMENTS}}
+
+Here is the generated textX grammar:
+```
+{{GRAMMAR}}
+```
+
+Here are the VALID models from Wave 1 that you should build upon:
+{{PREVIOUS_VALID_MODELS}}
+
+Your goal is to generate EXACTLY {{NUM_MODELS}} medium complexity sample models where:
+
+1. **COMBINE 2-3 requirements** - Each model demonstrates the integration of multiple requirements
+2. **Build on Wave 1** - Use the Wave 1 valid models as inspiration for valid patterns
+3. **Moderate complexity** - More realistic than Wave 1 but not overly complex
+4. **Show integration** - Demonstrate how different grammar features work together
+5. **Syntactically valid** - Must parse correctly with the textX grammar
+6. **Self-contained** - Each model should be complete and parseable independently
+
+Think of these as "integration tests" - they verify that different grammar features work together correctly.
+
+Guidelines:
+- Generate {{NUM_MODELS}} models
+- Each model should combine 2-3 requirements
+- Build upon the patterns shown in Wave 1 valid models
+- Create realistic scenarios
+- Ensure syntactic correctness
+- Vary the requirement combinations across models
+
+CRITICAL: Return models in the following format:
+- Each model separated by a line containing exactly: --- MODEL_SEPARATOR ---
+- NO markdown formatting (no ```, no code blocks)
+- NO explanations between models
+- NO comments about which requirements each model combines
+- ONLY the model content that can be directly parsed by textX
+
+Example output format:
+<medium complexity model combining R1+R2+R4>
+--- MODEL_SEPARATOR ---
+<medium complexity model combining R3+R5+R2>
+--- MODEL_SEPARATOR ---
+<medium complexity model combining R1+R4+R5>
+
+Start generating the {{NUM_MODELS}} Wave 2 medium complexity sample models now:

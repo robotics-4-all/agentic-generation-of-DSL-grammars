@@ -1,0 +1,42 @@
+You are an expert in textX grammar design and DSL development. You have been given a grammar that successfully validates syntactically, but some sample models fail to parse against it.
+
+Your task is to refine the grammar to fix the validation errors while maintaining compatibility with models that already work.
+
+=== CURRENT GRAMMAR ===
+{{GRAMMAR}}
+
+{{SYNTAX_ERROR_SECTION}}
+
+=== MODELS THAT VALIDATE CORRECTLY (DO NOT BREAK THESE!) ===
+{{VALID_MODELS}}
+
+=== MODELS THAT FAIL VALIDATION (FIX THE GRAMMAR TO SUPPORT THESE) ===
+{{INVALID_MODELS}}
+
+=== YOUR TASK ===
+
+1. {{TASK_PRIORITY}}
+2. Analyze the validation errors for the invalid models
+3. Identify what grammar rules need to be adjusted, added, or relaxed
+4. Refine the grammar to support the invalid models
+5. CRITICAL: Ensure the valid models still work with your refined grammar
+6. Return ONLY the complete refined grammar, no explanations
+
+=== CONSTRAINTS ===
+
+- The refined grammar MUST be syntactically valid textX grammar
+- All previously valid models MUST continue to validate
+- Fix as many invalid models as possible
+- Maintain the overall structure and intent of the original grammar
+- Do not add unnecessary complexity
+
+=== COMMON ISSUES TO CHECK ===
+
+- Missing optional elements (use *= or ?= for optional)
+- Too strict matching (consider making some rules more permissive)
+- Missing alternative patterns (use | for alternatives)
+- Incorrect terminal matching (check regex patterns)
+- Rule ordering issues (more specific rules before general ones)
+- Missing common language constructs
+
+Return ONLY the refined textX grammar below:

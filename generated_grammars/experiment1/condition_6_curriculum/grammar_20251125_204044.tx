@@ -1,0 +1,252 @@
+SmartHomeModel:
+    (
+        metadata=Metadata
+        brokers*=BrokerConfig
+        auth=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+BasicCredentials:
+    'username:' username=STRING
+    'password:' password=STRING
+;
+
+TokenCredentials:
+    'token:' token=STRING
+;
+
+CertCredentials:
+    'cert_path:' cert_path=STRING
+    'key_path:' key_path=STRING
+;
+
+Credentials:
+    BasicCredentials | TokenCredentials | CertCredentials
+;
+
+AuthMethod:
+    'basic' | 'token' | 'certificate' | 'oauth2'
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('method:' method=AuthMethod)
+        ('credentials:' credentials=Credentials)
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'switch' | 'light' | 'thermostat' | 'camera' | 'lock' | 'alarm' | 'other'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+ActionParameter:
+    name=ID ':' param_type=DataType
+;
+
+CapabilityAction:
+    action_name=ID ('(' parameters*=ActionParameter[','] ')')?
+;
+
+Capability:
+    name=ID ':' actions*=CapabilityAction[',']
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+        ('location:' location=STRING)?
+        ('manufacturer:' manufacturer=STRING)?
+        ('model:' model=STRING)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;
+
+CronExpression:
+    'cron:' expression=STRING
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TimeInterval:
+    'interval:' interval=INT unit=TimeUnit
+;
+
+FixedTime:
+    'at:' time=STRING
+;
+
+TimeSpec:
+    CronExpression | TimeInterval | FixedTime
+;
+
+TimeTrigger:
+    'time' '(' time_spec=TimeSpec ')'
+;
+
+StateTrigger:
+    'state' '(' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue ')'
+;
+
+EventTrigger:
+    'event' '(' event_type=STRING ('from:' source=[Entity])? ')'
+;
+
+ManualTrigger:
+    'manual'
+;
+
+Trigger:
+    TimeTrigger | StateTrigger | EventTrigger | ManualTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'not_contains'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+GroupCondition:
+    '(' condition=ConditionGroup ')'
+;
+
+Condition:
+    SimpleCondition | GroupCondition
+;
+
+ConditionGroup:
+    conditions+=Condition (logical_op=LogicalOperator conditions+=Condition)*
+;
+
+ActionParam:
+    name=ID '=' value=PropertyValue
+;
+
+EntityAction:
+    'entity_action' entity=[Entity] capability=ID action=ID ('(' parameters*=ActionParam[','] ')')?
+;
+
+NotificationAction:
+    'notification' '(' message=STRING ('to:' recipients*=STRING[','])? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT unit=TimeUnit ')'
+;
+
+ScriptAction:
+    'script' '(' script_path=STRING ('args:' arguments*=STRING[','])? ')'
+;
+
+Action:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=Action['-'])
+        ('execution_mode:' execution_mode=ExecutionMode)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

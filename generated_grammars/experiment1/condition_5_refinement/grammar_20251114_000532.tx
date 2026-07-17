@@ -1,0 +1,114 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'metadata' '{'
+        ('name' ':' name=STRING)?
+        ('version' ':' version=STRING)?
+        ('description' ':' description=STRING)?
+        ('author' ':' author=STRING)?
+    '}'
+;
+
+BrokerType:
+    'MQTT' | 'AMQP' | 'HTTP' | 'CoAP'
+;
+
+Authentication:
+    'username' ':' username=STRING
+    'password' ':' password=STRING
+;
+
+Broker:
+    'broker' name=ID '{'
+        'type' ':' brokerType=BrokerType
+        'host' ':' host=STRING
+        'port' ':' port=INT
+        ('ssl' ':' ssl=BOOL)?
+        ('authentication' ':' authentication=Authentication)?
+    '}'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller'
+;
+
+DataType:
+    'str' | 'int' | 'float' | 'bool' | 'array' | 'object'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=Value)?
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+Value:
+    STRING | FLOAT | INT | BOOL | entity=[Entity] '.' property=ID
+;
+
+SimpleCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=Value
+;
+
+Condition:
+    left=SimpleCondition (operator=LogicalOperator right=SimpleCondition)*
+    | '(' condition=Condition ')'
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=Value
+;
+
+Parameter:
+    name=ID '=' value=Value
+;
+
+ServiceAction:
+    'call' serviceName=STRING '(' parameters*=Parameter ')'
+;
+
+NotificationAction:
+    'notify' message=STRING ('via' channel=STRING)?
+;
+
+Action:
+    EntityAction | ServiceAction | NotificationAction
+;
+
+Behavior:
+    name=ID ':' '{'
+        'trigger' ':' trigger=Condition
+        'action' ':' action=Action
+    '}'
+;
+
+Entity:
+    'entity' name=ID '{'
+        'type' ':' entityType=EntityType
+        ('broker' ':' broker=[Broker])?
+        ('properties' '{' properties*=Property '}' )?
+        ('behaviors' '{' behaviors*=Behavior '}' )?
+    '}'
+;
+
+Automation:
+    'automation' name=ID '{'
+        'trigger' ':' trigger=Condition
+        'conditions' ':' conditions*=Condition
+        'actions' ':' actions*=Action
+        ('enabled' ':' enabled=BOOL)?
+    '}'
+;

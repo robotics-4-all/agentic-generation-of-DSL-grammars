@@ -1,0 +1,601 @@
+Sample Model Generation for Grammar Beta Testing
+
+Task:
+You are an expert in Domain-Specific Languages (DSLs) and textX grammar. Your task is to generate sample models that demonstrate and validate the capabilities of a given textX grammar.
+
+EXAMPLE: Calculator DSL
+========================
+
+To illustrate what is expected, here's a complete example:
+
+Example Requirements:
+R1 - The grammar should support variable declarations with numeric types.
+R2 - The grammar should support basic arithmetic operations (add, subtract, multiply, divide).
+R3 - The grammar should support function definitions with parameters.
+R4 - The grammar should support conditional expressions (if-then-else).
+R5 - The grammar should support loops with iteration control.
+R6 - The grammar should support comments for documentation.
+
+Example Grammar:
+```
+Program: statements*=Statement;
+
+Statement:
+    VariableDeclaration | Assignment | FunctionDef | IfStatement | Loop | Expression
+;
+
+VariableDeclaration:
+    'var' name=ID ':' type=Type '=' value=Expression
+;
+
+Type: 'int' | 'float';
+
+Assignment:
+    name=ID '=' value=Expression
+;
+
+FunctionDef:
+    'function' name=ID '(' params*=Parameter[','] ')' ':' type=Type
+    'begin'
+        body*=Statement
+    'end'
+;
+
+Parameter: name=ID ':' type=Type;
+
+IfStatement:
+    'if' condition=Expression 'then'
+        then_body*=Statement
+    ('else'
+        else_body*=Statement)?
+    'endif'
+;
+
+Loop:
+    'for' var=ID 'in' start=Expression 'to' end=Expression
+        body*=Statement
+    'endfor'
+;
+
+Expression:
+    Arithmetic | FunctionCall | ID | NUMBER
+;
+
+Arithmetic:
+    left=Operand op=Operator right=Operand
+;
+
+Operand: NUMBER | ID | '(' Expression ')';
+
+Operator: '+' | '-' | '*' | '/';
+
+FunctionCall:
+    name=ID '(' args*=Expression[','] ')'
+;
+
+Comment: /\/\/.*$/;
+```
+
+Example Sample Models (covering requirements):
+
+Model 1 (R1 - Variable declarations):
+```
+var x : int = 10
+var y : float = 3.14
+var z : int = 42
+```
+
+Model 2 (R2 - Arithmetic operations):
+```
+var a : int = 5 + 3
+var b : int = 10 - 2
+var c : int = 4 * 6
+var d : float = 20 / 4
+```
+
+Model 3 (R3 - Function definition):
+```
+function add : int
+begin
+    var result : int = 10 + 5
+end
+
+function multiply : int
+begin
+    var product : int = 3 * 7
+end
+```
+
+Model 4 (R4 - Conditional expression):
+```
+var x : int = 10
+if x then
+    var y : int = 20
+else
+    var y : int = 30
+endif
+```
+
+Model 5 (R5 - Loop):
+```
+for i in 1 to 10
+    var temp : int = i * 2
+endfor
+```
+
+Model 6 (R1 + R2 + R6 - Combined: variables, arithmetic, comments):
+```
+var a : int = 5
+var b : int = 10
+var sum : int = a + b
+var product : int = a * b
+```
+
+========================
+END OF EXAMPLE
+========================
+
+YOUR TASK:
+==========
+
+Here is the textX grammar:
+```
+// ROOT RULE - Must be first
+dFlow:
+(
+    (metadata=Metadata)?
+
+    ('entities'
+        entities*=TrainableEntity
+    'end')?
+
+    ('synonyms'
+        synonyms*=Synonym
+    'end')?
+
+    ('gslots'
+        gslots*=GlobalSlot[',']
+    'end')?
+
+    ('triggers'
+        triggers+=Trigger
+    'end')?
+
+    ('dialogues'
+        dialogues+=Dialogue
+    'end')?
+
+    ('eservices'
+        eservices*=EServiceDef
+    'end')?
+
+    ('access_controls'
+        access_control=AccessControlDef
+    'end')?
+
+    ('connectors'
+        connectors*=Connector
+    'end')?
+
+    ('nluconfig'
+        nlu_config=NLUConfig
+    'end')?
+)#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('email:' email=STRING)?
+    )#
+    'end'
+;
+
+// TERMINALS AND HELPER RULES
+// FQN: ID('.'ID)*;
+ADDRESS_ID: /([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}/;
+
+FQN: ID+['.'];
+FQNI: ID+['.']('.*')?;
+// Import: 'import' importURI=FQNI ('as' name=ID)?;
+NID: /(.*?)\n/;
+NIDREF: NID+['.']('.*')?;
+Import: 'import' name=STRING;
+
+// Comments
+Comment: CommentLine | CommentBlock ;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;
+
+Word: /[-\w ]*\b/;
+WordExt: /[-\.\@\w ]*\b/;
+
+Connector: Slack | Telegram;
+
+Slack:
+    'Connector' name='slack'
+    (
+        ('token:' token=STRING)
+        ('channel:' channel=STRING)
+        ('signing_secret:' signing_secret=STRING)
+    )#
+    'end'
+;
+
+Telegram:
+    'Connector' name='telegram'
+    (
+        ('token:' token=STRING)
+        ('verify:' verify=STRING)
+        ('webhook_url:' webhook_url=STRING)
+    )#
+    'end'
+;
+
+
+NLUConfig:
+    (
+        ('model_name:' name=STRING)
+        ('model_weights:' weights=STRING)
+    )#
+;
+
+AccessControlDef:
+    (
+    roles=Roles
+    policies*=Policy
+    (path=Path)?
+    (users=Users)?
+    authentication=Authentication
+    )#
+;
+
+Roles:
+    'Roles'
+        words+=Word[',']
+        'default:'
+            default=Word
+    'end'
+;
+
+Policy:
+    'Policy' name=ID
+        'on:' actions+=Word[',']
+        'roles:' roles+=Word[',']
+    'end'
+;
+
+Path:
+    'Path'
+        path=STRING
+    'end'
+;
+
+Users:
+    'Users'
+        roles+=UserRoles
+    'end'
+;
+
+Authentication:
+    'Authentication'
+        'method:' method=AuthMethods
+        (
+        'slot_name:' slot_name=Word
+        )?
+    'end'
+;
+
+UserRoles: role=Word ':' users+=WordExt[','];
+
+AuthMethods: 'slot' | 'user_id' | 'slack' | 'telegram';
+
+// ENTITIY --------------------------------------------------------------
+// ----------------------------------------------------------------------
+Entity: TrainableEntity | PretrainedEntity;
+
+TrainableEntity:
+    'Entity' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+PretrainedEntity:
+    'PERSON'        |
+    'NORP'          |
+    'FAC'           |
+    'ORG'           |
+    'GPE'           |
+    'LOC'           |
+    'PRODUCT'       |
+    'EVENT'         |
+    'WORK_OF_ART'   |
+    'LAW'           |
+    'LANGUAGE'      |
+    'DATE'          |
+    'TIME'          |
+    'PERCENT'       |
+    'MONEY'         |
+    'QUANTITY'      |
+    'ORDINAL'       |
+    'CARDINAL'
+;
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+Synonym:
+    'Synonym' name=ID
+        words+=STRING[',']
+    'end'
+;
+
+// TRIGGER --------------------------------------------------------------
+// ----------------------------------------------------------------------
+Trigger: Intent | Event;
+
+Intent:
+    'Intent' name=ID
+        phrases+=IntentPhraseComplex[',']
+    'end'
+;
+
+Event:
+    'Event' name=ID
+        uri=STRING
+    'end'
+;
+
+IntentPhraseComplex: phrases+=IntentPhrase;
+
+IntentPhrase:
+    IntentPhraseStr |
+    IntentPhraseSynonym |
+    TrainableEntityRef |
+    PretrainedEntityRef
+;
+
+IntentPhraseStr: STRING;
+
+TrainableEntityRef: 'TE:' entity=[TrainableEntity|FQN|^entities*];
+
+PretrainedEntityRef: 'PE:' entity=[PretrainedEntity|FQN|^entities*] ('[' refPreValues*=STRING[','] ']')?;
+
+IntentPhraseSynonym: 'S:' synonym=[Synonym|FQN];
+// ----------------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+// DIALOGUE -------------------------------------------------------------
+// ----------------------------------------------------------------------
+Dialogue:
+    'Dialogue' name=ID
+        'on:' onTrigger+=[Trigger|FQN|^triggers][',']
+        'responses:' responses+=Response[',']
+    'end'
+;
+
+Response: ActionGroup | Form;
+
+Form:
+    'Form' name=ID
+        params+=FormParam
+    'end'
+;
+
+FormParam:
+    name=ID ':' type=ParameterTypeDef '=' source=FormParamSource
+;
+
+FormParamRef: param=[FormParam|FQN|^dialogues*.responses.params];
+FormParamIndex: FormParamRef('['ID('.'ID)*']')?;
+
+FormParamSource: HRIParamSource | EServiceParamSource;
+
+HRIParamSource:
+    'HRI' '(' askSlot+=Text (',' '['extract+=ExtractionSource[','] ']')? ')'
+;
+
+ExtractionSource: ExtractFromEntity | ExtractFromIntent;
+ExtractFromIntent: intent=[Trigger|FQN|^triggers*] ':' value=ParameterValue;
+/* ExtractFromEntity: entity=[Entity|FQN|^entities*]; */
+ExtractFromEntity: TrainableEntityRef | PretrainedEntityRef;
+
+// EService -------------------------------------------------------------
+// ----------------------------------------------------------------------
+
+EServiceDef: EServiceDefHTTP;
+
+EServiceDefHTTP:
+    'EServiceHTTP' name=ID
+        (  'verb:' verb=HTTPVerb
+          'host:' host=STRING
+          ('port:' port=INT)?
+          ('path:' path=STRING)?
+          ('mime:' mime*=STRING[','])?
+        )#
+    'end'
+;
+
+EServiceParamSource: EServiceCallHTTP;
+
+EServiceCallHTTP:
+    eserviceRef=[EServiceDef|FQN|eservices]'('
+        (
+        ('query=' '[' query_params*=EServiceParam[','] ']' ',')?
+        ('header=' '[' header_params*=EServiceParam[','] ']' ',')?
+        ('path=' '[' path_params*=EServiceParam[','] ']' ',')?
+        ('body=' '[' body_params*=EServiceParam[','] ']' ',')?
+        )#
+    ')' ('[' response_filter=EServiceResponseFilter ']')? ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+EServiceParam: name=ID '=' value=ParameterValue;
+
+ParameterValue:
+    INT                 |
+    FLOAT               |
+    STRING              |
+    BOOL                |
+    List                |
+    Dict                |
+    EnvPropertyDef		|
+    FormParamIndex      |
+    GlobalSlotIndex     |
+	Text
+;
+
+ParameterTypeDef:
+    'int'   |
+    'float' |
+    'str'   |
+    'bool'  |
+    'list'  |
+    'dict'
+;
+
+EServiceResponseFilter: EServiceResponseElement('.'EServiceResponseElement)*;
+
+EServiceResponseElement: ID | INT;
+// ----------------------------------------------------------------------
+
+// Global Slots ---------------------------------------------------------
+// ----------------------------------------------------------------------
+GlobalSlotValue: ParameterValue;
+GlobalSlotType: ParameterTypeDef;
+GlobalSlotRef: slot=[GlobalSlot|FQN|^gslots];
+GlobalSlotIndex: FormParamRef('['ID('.'ID)*']')?;
+
+GlobalSlot:
+    name=ID ':' type=GlobalSlotType ('=' default=GlobalSlotValue)?
+;
+// ----------------------------------------------------------------------
+
+// ACTIONS --------------------------------------------------------------
+// ----------------------------------------------------------------------
+ActionGroup:
+    'ActionGroup' name=ID
+        actions+=Action
+    'end'
+;
+
+Action:
+    SpeakAction     |
+    FireEventAction |
+    RESTCallAction  |
+    SetFormSlot     |
+    SetGlobalSlot
+;
+
+SpeakAction:
+    'Speak' '(' text+=Text ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetFormSlot:
+    'SetFSlot' '(' slotRef=FormParamRef ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+SetGlobalSlot:
+    'SetGSlot' '(' slotRef=GlobalSlotRef ',' value=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+FireEventAction:
+    'FireEvent' '(' uri+=Text ',' msg=ParameterValue ')' ('[' 'roles' '=' roles+=Word[','] ']')?
+;
+
+RESTCallAction: EServiceCallHTTP;
+// ----------------------------------------------------------------------
+
+
+// ----------------------------------------------------------------------
+
+// GENERAL --------------------------------------------------------------
+// ----------------------------------------------------------------------
+HTTPVerb:
+    'GET'   |
+    'POST'  |
+    'PUT'
+;
+
+EnvPropertyDef: UserPropertyDef | SystemPropertyDef;
+UserPropertyDef: 'USER:' property=[UserProperty|FQN];
+SystemPropertyDef: 'SYSTEM:' property=[SystemProperty|FQN];
+
+UserProperty:
+    'NAME'      |
+    'SURNAME'   |
+    'AGE'       |
+    'EMAIL'     |
+    'PHONE'		|
+    'CITY'		|
+    'ADDRESS'
+;
+
+SystemProperty:
+	'TIME'			|
+	'LOCATION'		|
+	'RANDOM_INT'	|
+	'RANDOM_FLOAT'  |
+    'HOSTNAME'      |
+    'PUBLIC_IP'     |
+    'USER_EXPRESSION'
+;
+
+// TYPES
+
+DictItem:
+    name=ID ':' value=DictType
+;
+
+DictType:
+    NUMBER | STRING | BOOL | Dict | List | FormParamIndex | GlobalSlotIndex
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+List:
+    '[' items*=ListElement[','] ']'
+;
+
+ListElement:
+    NUMBER | STRING | BOOL | List | Dict | FormParamIndex | GlobalSlotIndex
+;
+
+
+Text: STRING | EnvPropertyDef | FormParamIndex | GlobalSlotIndex;
+
+```
+
+Your goal is to generate approximately 30 sample models that:
+1. Each model should demonstrate at least one requirement (from the requirements above)
+2. Some models should combine 2-3 requirements to show integrated functionality
+3. Models should be syntactically valid according to the textX grammar above
+4. Models should cover diverse use cases and edge cases where applicable
+5. Think of these as "beta test" models that validate the grammar works correctly
+6. Follow the style shown in the Calculator DSL example above
+
+Guidelines:
+- Generate models that are realistic and meaningful
+- Cover both simple cases (single requirement) and complex cases (multiple requirements)
+- Ensure models are syntactically correct according to the grammar
+- Each model should be self-contained and parseable
+- Vary the complexity and structure across models
+- Use the Calculator DSL example as inspiration for structure and variety
+
+CRITICAL: Return models in the following format:
+- Each model separated by a line containing exactly: --- MODEL_SEPARATOR ---
+- NO markdown formatting (no ```, no code blocks)
+- NO explanations between models
+- ONLY the model content that can be directly parsed by textX
+
+Example output format:
+<model content for model 1>
+--- MODEL_SEPARATOR ---
+<model content for model 2>
+--- MODEL_SEPARATOR ---
+<model content for model 3>
+
+Start generating the sample models now:

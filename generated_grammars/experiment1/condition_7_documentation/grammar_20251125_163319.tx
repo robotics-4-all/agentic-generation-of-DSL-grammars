@@ -1,0 +1,302 @@
+SmAutoModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+        termPools*=TermPool
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('webPath:' webPath=STRING)?
+        ('webPort:' webPort=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('topicExchange:' topicE=STRING)?
+        ('rpcExchange:' rpcE=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+Authentication:
+    AuthPlain | AuthApiKey | AuthCert
+;
+
+AuthPlain:
+    'Auth<Plain>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+AuthApiKey:
+    'Auth<ApiKey>' name=ID
+    (
+        ('key:' key=STRING)
+    )#
+    'end'
+;
+
+AuthCert:
+    'Auth<Cert>' name=ID
+    (
+        ('cert:' cert=STRING)?
+        ('certPath:' certPath=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=EntityProperty['-'])?
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'hybrid' | 'device' | 'virtual'
+;
+
+EntityProperty:
+    name=ID ':' dataType=PropertyDataType ('=' defaultValue=PropertyValue)?
+;
+
+PropertyDataType:
+    'int' | 'float' | 'string' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+EntityBehavior:
+    name=ID ':' action=BehaviorAction
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response' | 'notify'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' conditions=[TermPool])?
+        ('actions:' '-' actions*=AutomationAction['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+EntityTrigger:
+    'entity:' entity=[Entity] ('property:' property=ID)? ('operator:' operator=TriggerOperator)? ('value:' value=PropertyValue)?
+;
+
+TimeTrigger:
+    'time:' timeSpec=TimeSpecification
+;
+
+EventTrigger:
+    'event:' eventName=STRING ('source:' source=[Entity])?
+;
+
+TriggerOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'changed' | 'contains'
+;
+
+TimeSpecification:
+    CronExpression | IntervalExpression | FixedTimeExpression
+;
+
+CronExpression:
+    'cron:' expression=STRING
+;
+
+IntervalExpression:
+    'interval:' value=INT unit=TimeUnit
+;
+
+FixedTimeExpression:
+    'at:' time=TimeValue
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days' | 'weeks'
+;
+
+TimeValue:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+AutomationAction:
+    EntityAction | NotificationAction | DelayAction | ScriptAction
+;
+
+EntityAction:
+    'entity:' entity=[Entity] 'property:' property=ID 'value:' value=PropertyValue
+;
+
+NotificationAction:
+    'notify:' message=STRING ('channel:' channel=STRING)?
+;
+
+DelayAction:
+    'delay:' duration=INT unit=TimeUnit
+;
+
+ScriptAction:
+    'script:' script=STRING ('language:' language=ScriptLanguage)?
+;
+
+ScriptLanguage:
+    'python' | 'javascript' | 'bash' | 'lua'
+;
+
+TermPool:
+    'TermPool' name=ID
+    (
+        conditions*=Condition
+    )#
+    'end'
+;
+
+PrimitiveCondition:
+    EntityCondition | TimeCondition | NumericCondition | StringCondition | BooleanCondition
+;
+
+ConditionGroup:
+    '(' r=Condition ')' | PrimitiveCondition
+;
+
+Condition:
+    r1=ConditionGroup (operator=LogicalOperator r2=ConditionGroup)*
+;
+
+EntityCondition:
+    entity=[Entity] ('.' property=ID)? operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TimeValue
+;
+
+NumericCondition:
+    left=NumericExpression operator=NumericOperator right=NumericExpression
+;
+
+StringCondition:
+    left=StringExpression operator=StringOperator right=StringExpression
+;
+
+BooleanCondition:
+    left=BooleanExpression operator=BooleanOperator right=BooleanExpression
+;
+
+NumericExpression:
+    EntityPropertyRef | NUMBER
+;
+
+StringExpression:
+    EntityPropertyRef | STRING
+;
+
+BooleanExpression:
+    EntityPropertyRef | BOOL
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=ID
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not' | 'xor'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+NumericOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+StringOperator:
+    '==' | '!=' | 'contains' | 'startsWith' | 'endsWith' | 'matches'
+;
+
+BooleanOperator:
+    '==' | '!=' | 'is' | 'is not'
+;
+
+Comment:
+    CommentLine | CommentBlock
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;

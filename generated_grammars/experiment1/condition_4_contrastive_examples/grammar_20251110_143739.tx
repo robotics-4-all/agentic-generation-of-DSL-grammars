@@ -1,0 +1,305 @@
+SmartEnvironmentModel:
+    imports*=ImportStatement
+    (metadata=Metadata)?
+    (
+        (brokers*=BrokerDefinition)
+        (entities*=EntityDefinition)
+        (automations*=AutomationDefinition)
+        (conditions*=ConditionDefinition)
+        (actions*=ActionDefinition)
+    )#
+;
+
+ImportStatement:
+    'import' module=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+DataType:
+    'float' | 'int' | 'string' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+ActionType:
+    'publish' | 'request' | 'control' | 'notify' | 'log' | 'script'
+;
+
+PropertyReference:
+    entity=[EntityDefinition] '.' property=ID
+;
+
+NoAuth:
+    'None'
+;
+
+BasicAuth:
+    'Basic'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+TokenAuth:
+    'Token'
+    (
+        ('token:' token=STRING)
+        ('type:' tokenType=STRING)?
+    )#
+;
+
+CertificateAuth:
+    'Certificate'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)?
+        ('ca:' ca=STRING)?
+    )#
+;
+
+AuthenticationMethod:
+    CertificateAuth | TokenAuth | BasicAuth | NoAuth
+;
+
+KeyValuePair:
+    key=STRING ':' value=STRING
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationMethod)?
+        ('topics:' '-' topics*=STRING['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationMethod)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('baseUrl:' baseUrl=STRING)
+        ('port:' port=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=AuthenticationMethod)?
+        ('headers:' '-' headers*=KeyValuePair['-'])?
+    )#
+    'end'
+;
+
+BrokerDefinition:
+    HTTPBroker | AMQPBroker | MQTTBroker
+;
+
+PropertyDefinition:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+PropertyTrigger:
+    'PropertyTrigger'
+    (
+        ('property:' property=PropertyReference)
+        ('operator:' operator=ComparisonOperator)
+        ('value:' value=PropertyValue)
+    )#
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=STRING)
+        ('recurring:' recurring=BOOL)?
+    )#
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('source:' source=STRING)?
+    )#
+;
+
+TriggerDefinition:
+    EventTrigger | TimeTrigger | PropertyTrigger
+;
+
+BehaviorDefinition:
+    'behavior' name=ID
+    (
+        ('triggers:' '-' triggers*=TriggerDefinition['-'])
+        ('actions:' '-' actions*=[ActionDefinition]['-'])
+        ('conditions:' '-' conditions*=[ConditionDefinition]['-'])?
+    )#
+;
+
+EntityDefinition:
+    'Entity' name=ID
+    (
+        ('type:' entityType=EntityType)
+        ('broker:' broker=[BrokerDefinition])
+        ('topic:' topic=STRING)?
+        ('endpoint:' endpoint=STRING)?
+        ('properties:' '-' properties*=PropertyDefinition['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDefinition['-'])?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+FunctionCall:
+    function=ID '(' args*=FunctionArgument[','] ')'
+;
+
+FunctionArgument:
+    FunctionCall | PropertyReference | PropertyValue | STRING
+;
+
+ConditionOperand:
+    FunctionCall | PropertyReference | PropertyValue
+;
+
+ComparisonCondition:
+    left=ConditionOperand operator=ComparisonOperator right=ConditionOperand
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpression ')' | comparison=ComparisonCondition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+InlineCondition:
+    'inline' '(' expression=ConditionExpression ')'
+;
+
+ConditionReference:
+    ref=[ConditionDefinition] | inline=InlineCondition
+;
+
+ConditionDefinition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ParameterValue:
+    FunctionCall | PropertyReference | PropertyValue
+;
+
+ActionParameter:
+    name=ID ':' value=ParameterValue
+;
+
+EntityTarget:
+    'entity' '(' entity=[EntityDefinition] ')'
+;
+
+BrokerTarget:
+    'broker' '(' broker=[BrokerDefinition] (',' topic=STRING)? ')'
+;
+
+ExternalTarget:
+    'external' '(' url=STRING ')'
+;
+
+ActionTarget:
+    ExternalTarget | BrokerTarget | EntityTarget
+;
+
+InlineAction:
+    'inline' '(' type=ActionType ',' params*=ActionParameter[','] ')'
+;
+
+ActionReference:
+    ref=[ActionDefinition] | inline=InlineAction
+;
+
+ActionDefinition:
+    'Action' name=ID
+    (
+        ('type:' actionType=ActionType)
+        ('parameters:' '-' parameters*=ActionParameter['-'])
+        ('target:' target=ActionTarget)?
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+AutomationDefinition:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' '-' conditions*=ConditionReference['-'])
+        ('actions:' '-' actions*=ActionReference['-'])
+        ('executionMode:' executionMode=ExecutionMode)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentBlock | CommentLine
+;

@@ -1,0 +1,189 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStatement
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportStatement:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'object'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ComparisonOp:
+    '==' | '!=' | '<' | '>' | '<=' | '>='
+;
+
+LogicalOp:
+    'and' | 'or' | 'not'
+;
+
+PropertyDef:
+    name=ID ':' datatype=DataType ('=' default=PropertyValue)?
+;
+
+BehaviorDef:
+    name=ID ':' action=ActionDef
+;
+
+PlainAuth:
+    'Auth<Plain>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+KeyAuth:
+    'Auth<Key>' name=ID
+    (
+        ('key:' key=STRING)
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Cert>' name=ID
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    PlainAuth | KeyAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'event' entity=[EntityDef] '.' property=ID
+;
+
+TimeTrigger:
+    'time' schedule=STRING
+;
+
+StateTrigger:
+    'state' entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+TriggerDef:
+    EventTrigger | TimeTrigger | StateTrigger
+;
+
+SimpleCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOp value=PropertyValue
+;
+
+ComplexCondition:
+    left=SimpleCondition (logical_op=LogicalOp right=SimpleCondition)*
+;
+
+ConditionDef:
+    ComplexCondition | SimpleCondition
+;
+
+SetAction:
+    'set' entity=[EntityDef] '.' property=ID '=' value=PropertyValue
+;
+
+CallAction:
+    'call' entity=[EntityDef] '.' behavior=ID ('(' params*=PropertyValue[','] ')')?
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+ActionDef:
+    SetAction | CallAction | NotifyAction
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' conditions*=ConditionDef)?
+        ('actions:' '-' actions*=ActionDef['-'])
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

@@ -1,0 +1,3 @@
+1) Read malamas and garbounis to see methodology
+2) Get the same dsls malamas used for compare
+3) Get the prompt users gave in the papers to do qualitative evaluation and test the mechanism

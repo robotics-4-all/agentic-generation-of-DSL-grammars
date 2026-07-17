@@ -1,0 +1,229 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=MessageBroker
+        authentication*=Authentication
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+AuthType:
+    'basic' | 'token' | 'certificate' | 'oauth2'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'service' | 'virtual'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'array'
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'once' | 'repeat'
+;
+
+Parameter:
+    name=ID '=' value=PropertyValue
+;
+
+ParameterList:
+    '(' parameters*=Parameter[','] ')'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+PropertyCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time=STRING
+;
+
+StateCondition:
+    entity=[Entity] 'is' state=STRING
+;
+
+SimpleCondition:
+    PropertyCondition | TimeCondition | StateCondition
+;
+
+ConditionTerm:
+    '(' condition=Condition ')' | SimpleCondition
+;
+
+Condition:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+PropertyChange:
+    'PropertyChange' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeSchedule:
+    'TimeSchedule' schedule=STRING
+;
+
+EventTrigger:
+    'EventTrigger' event=STRING
+;
+
+Trigger:
+    PropertyChange | TimeSchedule | EventTrigger
+;
+
+SetPropertyAction:
+    'SetProperty' entity=[Entity] '.' property=ID '=' value=PropertyValue
+;
+
+SendMessageAction:
+    'SendMessage' broker=[MessageBroker] topic=STRING message=PropertyValue
+;
+
+CallServiceAction:
+    'CallService' service=STRING method=STRING parameters=ParameterList?
+;
+
+DelayAction:
+    'Delay' duration=INT unit=TimeUnit
+;
+
+Action:
+    SetPropertyAction | SendMessageAction | CallServiceAction | DelayAction
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('actions:' actions*=Action)
+    )#
+    'end'
+;
+
+Authentication:
+    'Authentication' name=ID
+    (
+        ('type:' type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('keyPath:' keyPath=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)?
+        (properties=PropertySection)?
+        (behaviors=BehaviorSection)?
+    )#
+    'end'
+;
+
+PropertySection:
+    '-' 'properties:' properties*=PropertyLine
+;
+
+PropertyLine:
+    '-' property=Property
+;
+
+BehaviorSection:
+    '-' 'behaviors:' behaviors*=BehaviorLine
+;
+
+BehaviorLine:
+    '-' behavior=Behavior
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('enabled:' enabled=BOOL)?
+        ('conditions:' conditions=Condition)
+        ('actions:' actions*=ActionLine)
+        ('executionMode:' mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+ActionLine:
+    '-' action=Action
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;

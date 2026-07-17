@@ -1,0 +1,256 @@
+SmAutoModel:
+    imports*=Import
+    (metadata=Metadata)?
+    (
+        brokers*=MessageBroker
+        entities*=Entity
+        automations*=Automation
+    )#
+;
+
+Import:
+    'import' importURI=FQN ('as' name=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('description:' description=STRING)?
+        ('system:' system=STRING)?
+    )#
+    'end'
+;
+
+PlainAuth:
+    'Plain'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+;
+
+ApiKeyAuth:
+    'ApiKey'
+    (
+        ('key:' key=STRING)
+    )#
+;
+
+CertAuth:
+    'Certificate'
+    (
+        ('cert:' cert=STRING)
+        ('key:' key=STRING)?
+    )#
+;
+
+Authentication:
+    PlainAuth | ApiKeyAuth | CertAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+        ('basePath:' basePath=STRING)?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=Authentication)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | RedisBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'virtual'
+;
+
+PropertyType:
+    'string' | 'number' | 'bool' | 'object' | 'array'
+;
+
+PropertyObjectItem:
+    name=STRING ':' value=PropertyValue
+;
+
+PropertyObject:
+    '{' items*=PropertyObjectItem[','] '}'
+;
+
+PropertyArray:
+    '[' items*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    STRING | NUMBER | BOOL | PropertyObject | PropertyArray
+;
+
+Property:
+    name=ID ':' ptype=PropertyType ('=' default=PropertyValue)?
+;
+
+BehaviorAction:
+    'publish' | 'subscribe' | 'request' | 'response'
+;
+
+Behavior:
+    name=ID ':' action=BehaviorAction
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('properties:' '-' properties*=Property['-'])?
+        ('behaviors:' '-' behaviors*=Behavior['-'])?
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+TimeInterval:
+    value=NUMBER unit=TimeUnit
+;
+
+TimeExpression:
+    'at' time=TIME | 'every' interval=TimeInterval
+;
+
+EntityTrigger:
+    'entity' entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeTrigger:
+    'time' time=TimeExpression
+;
+
+EventTrigger:
+    'event' event=STRING
+;
+
+Trigger:
+    EntityTrigger | TimeTrigger | EventTrigger
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+EntityCondition:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator value=TIME
+;
+
+StateCondition:
+    entity=[Entity] 'is' state=STRING
+;
+
+Condition:
+    EntityCondition | TimeCondition | StateCondition
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpression ')' | condition=Condition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+EntityAction:
+    'set' entity=[Entity] '.' property=ID 'to' value=PropertyValue
+;
+
+PublishAction:
+    'publish' topic=STRING 'message' message=PropertyValue
+;
+
+DelayAction:
+    'delay' duration=NUMBER unit=TimeUnit
+;
+
+ScriptAction:
+    'execute' script=STRING
+;
+
+Action:
+    EntityAction | PublishAction | DelayAction | ScriptAction
+;
+
+ExecutionMode:
+    'single' | 'restart' | 'queued' | 'parallel'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=Trigger)
+        ('conditions:' conditions=ConditionExpression)?
+        ('actions:' '-' actions*=Action['-'])
+        ('enabled:' enabled=BOOL)?
+        ('mode:' mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+FQN:
+    ID+['.']
+;
+
+TIME:
+    /([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?/
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

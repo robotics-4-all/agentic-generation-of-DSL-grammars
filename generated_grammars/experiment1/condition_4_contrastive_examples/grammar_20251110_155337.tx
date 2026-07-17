@@ -1,0 +1,336 @@
+SmartEnvironmentModel:
+    (
+        metadata=MetadataSection?
+        brokers*=BrokerSection
+        authentication*=AuthSection
+        entities*=EntitySection
+        automations*=AutomationSection
+    )#
+;
+
+MetadataSection:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+BrokerSection:
+    MQTTBroker | AMQPBroker | RedisBroker | KafkaBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthSection])?
+        ('topics:' '-' topics*=STRING['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthSection])?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthSection])?
+    )#
+    'end'
+;
+
+KafkaBroker:
+    'Broker<Kafka>' name=ID
+    (
+        ('bootstrap_servers:' servers*=STRING[','])
+        ('group_id:' group_id=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthSection])?
+        ('topics:' '-' topics*=STRING['-'])?
+    )#
+    'end'
+;
+
+AuthSection:
+    BasicAuth | TokenAuth | CertificateAuth | OAuth2Auth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+    )#
+    'end'
+;
+
+CertificateAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+OAuth2Auth:
+    'Auth<OAuth2>' name=ID
+    (
+        ('client_id:' client_id=STRING)
+        ('client_secret:' client_secret=STRING)
+        ('auth_url:' auth_url=STRING)
+        ('token_url:' token_url=STRING)
+        ('scope:' scope=STRING)?
+    )#
+    'end'
+;
+
+EntitySection:
+    SensorEntity | ActuatorEntity | HybridEntity | VirtualEntity
+;
+
+SensorEntity:
+    'Entity<Sensor>' name=ID
+    (
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+        ('broker:' broker=[BrokerSection])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Entity<Actuator>' name=ID
+    (
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('commands:' '-' commands*=EntityCommand['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+        ('broker:' broker=[BrokerSection])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+HybridEntity:
+    'Entity<Hybrid>' name=ID
+    (
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('commands:' '-' commands*=EntityCommand['-'])?
+        ('location:' location=STRING)?
+        ('status:' status=EntityStatus)?
+        ('broker:' broker=[BrokerSection])?
+        ('topic:' topic=STRING)?
+    )#
+    'end'
+;
+
+VirtualEntity:
+    'Entity<Virtual>' name=ID
+    (
+        ('properties:' '-' properties*=EntityProperty['-'])
+        ('behaviors:' '-' behaviors*=EntityBehavior['-'])?
+        ('simulation_data:' simulation_data=STRING)?
+        ('status:' status=EntityStatus)?
+    )#
+    'end'
+;
+
+EntityProperty:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+EntityBehavior:
+    name=ID ':' behavior_type=BehaviorType ('(' parameters=BehaviorParameters ')')?
+;
+
+EntityCommand:
+    name=ID ':' command_type=CommandType ('(' parameters=CommandParameters ')')?
+;
+
+BehaviorType:
+    'periodic' | 'event_driven' | 'threshold_based' | 'custom'
+;
+
+CommandType:
+    'toggle' | 'set_value' | 'increment' | 'decrement' | 'custom'
+;
+
+BehaviorParameters:
+    params*=ParameterPair[',']
+;
+
+CommandParameters:
+    params*=ParameterPair[',']
+;
+
+ParameterPair:
+    key=ID '=' value=PropertyValue
+;
+
+EntityStatus:
+    'active' | 'inactive' | 'maintenance' | 'error'
+;
+
+DataType:
+    'int' | 'float' | 'bool' | 'string' | 'timestamp' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING
+;
+
+AutomationSection:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' conditions=ConditionGroup)?
+        ('actions:' '-' actions*=AutomationAction['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | ThresholdTrigger | StateTrigger
+;
+
+TimeTrigger:
+    'time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'event' '(' entity=[EntitySection] ',' event_type=STRING ')'
+;
+
+ThresholdTrigger:
+    'threshold' '(' entity=[EntitySection] ',' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+StateTrigger:
+    'state_change' '(' entity=[EntitySection] ',' from_state=STRING ',' to_state=STRING ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+ConditionGroup:
+    conditions*=ConditionExpression
+;
+
+ConditionTerm:
+    '(' expr=ConditionExpression ')' | condition=Condition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOperator right=ConditionTerm)*
+;
+
+Condition:
+    PropertyCondition | StateCondition | TimeCondition | ExpressionCondition
+;
+
+PropertyCondition:
+    entity=[EntitySection] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+StateCondition:
+    entity=[EntitySection] '.state' operator=ComparisonOperator state=STRING
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=STRING
+;
+
+ExpressionCondition:
+    'expression' '(' expression=STRING ')'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'in' | 'not_in'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+AutomationAction:
+    EntityAction | NotificationAction | ScriptAction | DelayAction
+;
+
+EntityAction:
+    'entity_action' '(' entity=[EntitySection] ',' command=ID (',' params=ActionParameters)? ')'
+;
+
+NotificationAction:
+    'notification' '(' message=STRING (',' recipients*=STRING[','])? ')'
+;
+
+ScriptAction:
+    'script' '(' script_path=STRING (',' params=ActionParameters)? ')'
+;
+
+DelayAction:
+    'delay' '(' duration=INT ',' unit=TimeUnit ')'
+;
+
+ActionParameters:
+    params*=ParameterPair[',']
+;

@@ -1,0 +1,156 @@
+SmartEnvironmentModel:
+    (
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+Metadata:
+    'metadata'
+    (
+        ('name:' name=STRING)?
+        ('version:' version=STRING)?
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+    )#
+    'end'
+;
+
+ProtocolType:
+    'MQTT' | 'HTTP' | 'AMQP' | 'WebSocket'
+;
+
+BasicAuth:
+    'basic'
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'token'
+    (
+        'key:' key=STRING
+    )#
+    'end'
+;
+
+CertAuth:
+    'certificate'
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth
+;
+
+BrokerConfig:
+    'broker' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('protocol:' protocol=ProtocolType)?
+        ('auth:' auth=AuthConfig)?
+        ('ssl:' ssl=BOOL)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'gateway' | 'device'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'array' | 'object'
+;
+
+PropertyDef:
+    name=ID ':' data_type=DataType ('=' default_value=ValueExpr)?
+;
+
+TriggerExpr:
+    'on_change' | 'on_value' '(' value=ValueExpr ')' | 'on_timer' '(' interval=INT ')'
+;
+
+BehaviorDef:
+    'behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerExpr)
+        ('actions:' actions*=ActionDef)
+    )#
+    'end'
+;
+
+EntityDef:
+    'entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[BrokerConfig])?
+        ('topic:' topic=STRING)?
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+    )#
+    'end'
+;
+
+PropertyRef:
+    entity=[EntityDef] '.' property=ID
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>='
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ValueExpr:
+    STRING | FLOAT | INT | BOOL | PropertyRef
+;
+
+SimpleCondition:
+    left=PropertyRef operator=ComparisonOperator right=ValueExpr
+;
+
+ConditionExpr:
+    left=SimpleCondition (logical_op=LogicalOperator right=SimpleCondition)*
+;
+
+SetAction:
+    'set' target=PropertyRef 'to' value=ValueExpr
+;
+
+CallAction:
+    'call' entity=[EntityDef] '.' method=ID ('(' params*=ValueExpr[','] ')')?
+;
+
+NotifyAction:
+    'notify'
+    (
+        ('message:' message=STRING)
+        ('channel:' channel=STRING)?
+    )#
+;
+
+ActionDef:
+    SetAction | CallAction | NotifyAction
+;
+
+AutomationDef:
+    'automation' name=ID
+    (
+        ('conditions:' conditions*=ConditionExpr)
+        ('actions:' actions*=ActionDef)
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;

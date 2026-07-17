@@ -1,0 +1,294 @@
+SmartEnvironmentModel:
+    (
+        imports*=ImportStm
+        metadata=Metadata?
+        brokers*=BrokerConfig
+        authentication*=AuthConfig
+        entities*=EntityDef
+        automations*=AutomationDef
+    )#
+;
+
+ImportStm:
+    'import' module=STRING
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+AuthConfig:
+    BasicAuth | TokenAuth | CertAuth | KeyAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_path:' cert_path=STRING)
+        ('key_path:' key_path=STRING)
+        ('ca_path:' ca_path=STRING)?
+    )#
+    'end'
+;
+
+KeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('key_param:' key_param=STRING)?
+    )#
+    'end'
+;
+
+BrokerConfig:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('topic_prefix:' topic_prefix=STRING)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('base_path:' base_path=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+        ('auth:' auth=[AuthConfig])?
+    )#
+    'end'
+;
+
+EntityDef:
+    SensorEntity | ActuatorEntity | HybridEntity | VirtualEntity
+;
+
+SensorEntity:
+    'Entity<Sensor>' name=ID
+    (
+        ('broker:' broker=[BrokerConfig])
+        ('topic:' topic=STRING)
+        ('data_type:' data_type=DataType)
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ActuatorEntity:
+    'Entity<Actuator>' name=ID
+    (
+        ('broker:' broker=[BrokerConfig])
+        ('command_topic:' command_topic=STRING)
+        ('status_topic:' status_topic=STRING)?
+        ('data_type:' data_type=DataType)
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+HybridEntity:
+    'Entity<Hybrid>' name=ID
+    (
+        ('broker:' broker=[BrokerConfig])
+        ('sensor_topic:' sensor_topic=STRING)
+        ('actuator_topic:' actuator_topic=STRING)
+        ('data_type:' data_type=DataType)
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('location:' location=STRING)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+VirtualEntity:
+    'Entity<Virtual>' name=ID
+    (
+        ('compute_expression:' compute_expression=STRING)
+        ('dependencies:' dependencies*=[EntityDef][','])?
+        ('data_type:' data_type=DataType)
+        ('properties:' properties*=PropertyDef)?
+        ('behaviors:' behaviors*=BehaviorDef)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+PropertyDef:
+    name=ID ':' value=PropertyValue
+;
+
+PropertyValue:
+    STRING | FLOAT | INT | BOOL
+;
+
+BehaviorDef:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('actions:' actions*=ActionDef)
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+TriggerDef:
+    'on_change' | 'on_threshold' | 'on_pattern' | 'on_schedule'
+;
+
+DataType:
+    'temperature' | 'humidity' | 'pressure' | 'light' | 'motion' | 'switch' | 'dimmer' | 'lock' | 'camera' | 'audio' | 'custom'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=PrimitiveCondition)
+        ('conditions:' conditions*=ConditionDef)?
+        ('actions:' actions*=ActionDef)
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ConditionDef:
+    left=PrimitiveCondition (operator=LogicalOperator right=PrimitiveCondition)*
+;
+
+PrimitiveCondition:
+    ComparisonCondition | TimeCondition | StateCondition | ('(' ConditionDef ')')
+;
+
+ComparisonCondition:
+    entity=[EntityDef] '.' property=ID operator=ComparisonOperator value=ConditionValue
+;
+
+TimeCondition:
+    'time' operator=ComparisonOperator time_value=TimeValue
+;
+
+StateCondition:
+    entity=[EntityDef] '.' property=ID 'state' operator=ComparisonOperator state_value=STRING
+;
+
+ConditionValue:
+    STRING | FLOAT | INT | BOOL | EntityReference
+;
+
+EntityReference:
+    entity=[EntityDef] ('.' property=ID)?
+;
+
+TimeValue:
+    time_string=STRING | time_expression=TimeExpression
+;
+
+TimeExpression:
+    'sunrise' | 'sunset' | 'now' | 'midnight' | 'noon'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'matches'
+;
+
+ActionDef:
+    SetAction | CallAction | NotifyAction | DelayAction | ScriptAction
+;
+
+SetAction:
+    'set' entity=[EntityDef] '.' property=ID 'to' value=ActionValue
+;
+
+CallAction:
+    'call' service=STRING ('with' parameters=ParameterList)?
+;
+
+NotifyAction:
+    'notify' message=STRING ('to' target=STRING)?
+;
+
+DelayAction:
+    'delay' duration=FLOAT unit=TimeUnit
+;
+
+ScriptAction:
+    'script' script_content=STRING
+;
+
+ActionValue:
+    STRING | FLOAT | INT | BOOL | EntityReference
+;
+
+ParameterList:
+    '{' parameters*=Parameter[','] '}'
+;
+
+Parameter:
+    name=ID ':' value=ActionValue
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;

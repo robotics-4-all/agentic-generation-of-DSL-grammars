@@ -1,0 +1,252 @@
+SmartHomeModel:
+    (
+        metadata=Metadata?
+        brokers*=Broker
+        authentication=Authentication?
+        entities*=Entity
+        automations*=Automation
+        conditions*=Condition
+        actions*=Action
+    )#
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+AuthType:
+    'basic' | 'bearer' | 'api_key' | 'oauth2' | 'certificate' | 'none'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'light' | 'switch' | 'thermostat' | 'camera' | 'lock' | 'speaker' | 'display' | 'other'
+;
+
+DataType:
+    'str' | 'float' | 'int' | 'bool' | 'json' | 'binary'
+;
+
+PropertyValue:
+    FLOAT | INT | STRING | BOOL
+;
+
+CapabilityAction:
+    'read' | 'write' | 'execute' | 'subscribe'
+;
+
+EntityState:
+    'online' | 'offline' | 'error' | 'unknown'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'single'
+;
+
+ConditionType:
+    'state' | 'time' | 'numeric' | 'string' | 'boolean' | 'complex'
+;
+
+ComparisonOperator:
+    '==' | '!=' | '>' | '<' | '>=' | '<=' | 'contains' | 'starts_with' | 'ends_with'
+;
+
+LogicalOperator:
+    'and' | 'or' | 'not'
+;
+
+ActionType:
+    'control' | 'notification' | 'data' | 'system'
+;
+
+ActionOperation:
+    'set' | 'get' | 'toggle' | 'increment' | 'decrement' | 'execute' | 'notify'
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('topic:' topic=STRING)
+        ('qos:' qos=INT)?
+        ('retain:' retain=BOOL)?
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('method:' method=HTTPMethod)
+        ('ssl:' ssl=BOOL)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+CoAPBroker:
+    'Broker<CoAP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('confirmable:' confirmable=BOOL)?
+    )#
+    'end'
+;
+
+Broker:
+    MQTTBroker | HTTPBroker | CoAPBroker
+;
+
+Authentication:
+    'Authentication'
+    (
+        ('type:' auth_type=AuthType)
+        ('username:' username=STRING)?
+        ('password:' password=STRING)?
+        ('token:' token=STRING)?
+        ('api_key:' api_key=STRING)?
+        ('certificate:' certificate=STRING)?
+    )#
+    'end'
+;
+
+Property:
+    name=ID ':' data_type=DataType ('=' default_value=PropertyValue)?
+;
+
+Capability:
+    name=ID ':' actions*=CapabilityAction[',']
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('broker:' broker=[Broker])
+        ('location:' location=STRING)?
+        ('properties:' '-' properties*=Property['-'])?
+        ('capabilities:' '-' capabilities*=Capability['-'])?
+        ('state:' state=EntityState)?
+    )#
+    'end'
+;
+
+CronSchedule:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalSchedule:
+    'interval' '(' seconds=INT ')'
+;
+
+OnceSchedule:
+    'once' '(' datetime=STRING ')'
+;
+
+TimeSchedule:
+    CronSchedule | IntervalSchedule | OnceSchedule
+;
+
+TimeTrigger:
+    'TimeTrigger' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'EventTrigger' '(' entity=[Entity] ',' event=STRING ')'
+;
+
+StateTrigger:
+    'StateTrigger' '(' entity=[Entity] '.' property=ID ',' operator=ComparisonOperator ',' value=PropertyValue ')'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '-' conditions*=[Condition]['-'])?
+        ('actions:' '-' actions*=[Action]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+SimpleExpression:
+    entity=[Entity] '.' property=ID operator=ComparisonOperator value=PropertyValue
+;
+
+ConditionExpression:
+    left=SimpleExpression (logical_operator=LogicalOperator right=SimpleExpression)*
+    | '(' expression=ConditionExpression ')'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('type:' condition_type=ConditionType)
+        ('expression:' expression=ConditionExpression)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+PropertyReference:
+    entity=[Entity] '.' property=ID
+;
+
+ParameterValue:
+    FLOAT | INT | STRING | BOOL | entity_ref=[Entity] | property_ref=PropertyReference
+;
+
+ActionParameter:
+    name=ID ':' value=ParameterValue
+;
+
+Action:
+    'Action' name=ID
+    (
+        ('type:' action_type=ActionType)
+        ('target:' target=[Entity])
+        ('operation:' operation=ActionOperation)
+        ('parameters:' '-' parameters*=ActionParameter['-'])?
+        ('retry_count:' retry_count=INT)?
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+CommentLine:
+    /\/\/.*?$/
+;
+
+CommentBlock:
+    /\/\*(.|\n)*?\*\//
+;
+
+Comment:
+    CommentLine | CommentBlock
+;

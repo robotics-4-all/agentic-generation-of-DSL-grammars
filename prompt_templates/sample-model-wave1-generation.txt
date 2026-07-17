@@ -1,0 +1,133 @@
+WAVE 1: Simple Sample Model Generation (Foundation Layer)
+==========================================================
+
+Task:
+You are an expert in Domain-Specific Languages (DSLs) and textX grammar. Your task is to generate SIMPLE sample models that each focus on demonstrating ONE SPECIFIC requirement from the grammar specification.
+
+This is WAVE 1 of a pyramid generation process - these are foundation models that demonstrate individual requirements in isolation.
+
+EXAMPLE: Calculator DSL Wave 1
+================================
+
+Example Requirements:
+R1 - The grammar should support variable declarations with numeric types.
+R2 - The grammar should support basic arithmetic operations (add, subtract, multiply, divide).
+R3 - The grammar should support function definitions with parameters.
+R4 - The grammar should support conditional expressions (if-then-else).
+
+Example Grammar:
+```
+Program: statements*=Statement;
+
+Statement:
+    VariableDeclaration | Assignment | FunctionDef | IfStatement | Expression
+;
+
+VariableDeclaration:
+    'var' name=ID ':' type=Type '=' value=Expression
+;
+
+Type: 'int' | 'float';
+
+FunctionDef:
+    'function' name=ID '(' params*=Parameter[','] ')' ':' type=Type
+    'begin'
+        body*=Statement
+    'end'
+;
+
+Parameter: name=ID ':' type=Type;
+
+IfStatement:
+    'if' condition=Expression 'then'
+        then_body*=Statement
+    ('else'
+        else_body*=Statement)?
+    'endif'
+;
+
+Expression: Arithmetic | ID | NUMBER;
+Arithmetic: left=Operand op=Operator right=Operand;
+Operand: NUMBER | ID;
+Operator: '+' | '-' | '*' | '/';
+```
+
+Example Wave 1 Models (ONE requirement per model):
+
+Model 1 (R1 ONLY - Variable declarations):
+```
+var x : int = 10
+var y : float = 3.14
+```
+
+Model 2 (R2 ONLY - Arithmetic operations):
+```
+var result : int = 5 + 3
+```
+
+Model 3 (R3 ONLY - Function definition):
+```
+function calculate : int
+begin
+    var temp : int = 5
+end
+```
+
+Model 4 (R4 ONLY - Conditional):
+```
+var x : int = 10
+if x then
+    var y : int = 20
+endif
+```
+
+Notice: Each model is SIMPLE and focuses on ONE requirement only.
+
+========================
+END OF EXAMPLE
+========================
+
+YOUR TASK:
+==========
+
+The grammar you need to generate sample models for was created to satisfy the following requirements:
+{{REQUIREMENTS}}
+
+Here is the generated textX grammar:
+```
+{{GRAMMAR}}
+```
+
+Your goal is to generate EXACTLY {{NUM_MODELS}} simple sample models where:
+
+1. **ONE MODEL PER REQUIREMENT** - Each model demonstrates exactly ONE requirement (R1, R2, R3, etc.)
+2. **Keep it SIMPLE** - Use minimal complexity, just enough to demonstrate the requirement
+3. **Focus on clarity** - Make it obvious which requirement each model demonstrates
+4. **Syntactically valid** - Must parse correctly with the textX grammar
+5. **Self-contained** - Each model should be complete and parseable independently
+6. **No combinations** - Do NOT combine multiple requirements in Wave 1 models
+
+Think of these as "unit tests" for individual grammar features - each model tests ONE specific capability.
+
+Guidelines:
+- Generate {{NUM_MODELS}} models (one per requirement)
+- Keep each model as simple as possible
+- Focus on demonstrating ONE requirement clearly
+- Ensure syntactic correctness
+- Use realistic but minimal content
+
+CRITICAL: Return models in the following format:
+- Each model separated by a line containing exactly: --- MODEL_SEPARATOR ---
+- NO markdown formatting (no ```, no code blocks)
+- NO explanations between models
+- NO comments about which requirement each model covers
+- ONLY the model content that can be directly parsed by textX
+
+Example output format:
+<simple model for R1>
+--- MODEL_SEPARATOR ---
+<simple model for R2>
+--- MODEL_SEPARATOR ---
+<simple model for R3>
+
+Start generating the {{NUM_MODELS}} Wave 1 simple sample models now:

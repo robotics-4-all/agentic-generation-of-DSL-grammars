@@ -1,0 +1,352 @@
+SmartEnvironmentModel:
+    (metadata=Metadata)?
+    (brokers*=MessageBroker)*
+    (authentication*=Authentication)*
+    (entities*=Entity)*
+    (automations*=Automation)*
+    (conditions*=Condition)*
+    (actions*=Action)*
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('created:' created=STRING)?
+    )#
+    'end'
+;
+
+MessageBroker:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl:' ssl=BOOL)?
+        ('keepalive:' keepalive=INT)?
+        ('qos:' qos=INT)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('endpoint:' endpoint=STRING)
+        ('method:' method=HTTPMethod)
+        ('headers:' '[' headers*=HeaderParam[','] ']')?
+        ('auth:' auth=[Authentication])?
+    )#
+    'end'
+;
+
+HTTPMethod:
+    'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'
+;
+
+HeaderParam:
+    key=STRING ':' value=STRING
+;
+
+Authentication:
+    BasicAuth | TokenAuth | KeyAuth | CertAuth
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('type:' type=STRING)?
+    )#
+    'end'
+;
+
+KeyAuth:
+    'Auth<APIKey>' name=ID
+    (
+        ('key:' key=STRING)
+        ('header:' header=STRING)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('certPath:' certPath=STRING)
+        ('keyPath:' keyPath=STRING)?
+        ('caPath:' caPath=STRING)?
+    )#
+    'end'
+;
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' type=EntityType)
+        ('location:' location=STRING)?
+        ('broker:' broker=[MessageBroker])?
+        ('topic:' topic=STRING)?
+        ('properties:' '[' properties*=Property[','] ']')?
+        ('behaviors:' '[' behaviors*=Behavior[','] ']')?
+        ('state:' state=EntityState)?
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'controller' | 'device' | 'virtual' | 'hybrid'
+;
+
+Property:
+    name=ID ':' dataType=DataType ('=' defaultValue=PropertyValue)?
+;
+
+DataType:
+    'string' | 'int' | 'float' | 'bool' | 'array' | 'object' | 'timestamp'
+;
+
+PropertyValue:
+    STRING | INT | FLOAT | BOOL | ArrayValue | ObjectValue
+;
+
+ArrayValue:
+    '[' items*=PropertyValue[','] ']'
+;
+
+ObjectValue:
+    '{' pairs*=ObjectPair[','] '}'
+;
+
+ObjectPair:
+    key=STRING ':' value=PropertyValue
+;
+
+Behavior:
+    'Behavior' name=ID
+    (
+        ('trigger:' trigger=BehaviorTrigger)
+        ('actions:' '[' actions*=[Action][','] ']')
+        ('enabled:' enabled=BOOL)?
+    )#
+    'end'
+;
+
+BehaviorTrigger:
+    'onUpdate' | 'onChange' | 'onThreshold' | 'onTime' | 'onEvent'
+;
+
+EntityState:
+    'online' | 'offline' | 'error' | 'maintenance' | 'unknown'
+;
+
+Automation:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=AutomationTrigger)
+        ('conditions:' '[' conditions*=[Condition][','] ']')?
+        ('actions:' '[' actions*=[Action][','] ']')
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution:' execution=ExecutionControl)?
+    )#
+    'end'
+;
+
+AutomationTrigger:
+    TimeTrigger | EventTrigger | StateTrigger | ManualTrigger
+;
+
+TimeTrigger:
+    'TimeTrigger'
+    (
+        ('schedule:' schedule=STRING)
+        ('interval:' interval=INT)?
+        ('once:' once=BOOL)?
+    )#
+    'end'
+;
+
+EventTrigger:
+    'EventTrigger'
+    (
+        ('event:' event=STRING)
+        ('source:' source=[Entity])?
+    )#
+    'end'
+;
+
+StateTrigger:
+    'StateTrigger'
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=STRING)
+        ('condition:' condition=[Condition])
+    )#
+    'end'
+;
+
+ManualTrigger:
+    'ManualTrigger'
+    (
+        ('name:' name=STRING)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+ExecutionControl:
+    'ExecutionControl'
+    (
+        ('mode:' mode=ExecutionMode)
+        ('timeout:' timeout=INT)?
+        ('retries:' retries=INT)?
+        ('delay:' delay=INT)?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional' | 'immediate'
+;
+
+Condition:
+    'Condition' name=ID
+    (
+        ('expression:' expression=LogicalExpression)
+        ('description:' description=STRING)?
+    )#
+    'end'
+;
+
+LogicalExpression:
+    orExpr=OrExpression
+;
+
+OrExpression:
+    left=AndExpression ('or' right=AndExpression)*
+;
+
+AndExpression:
+    left=NotExpression ('and' right=NotExpression)*
+;
+
+NotExpression:
+    ('not')? expr=ComparisonExpression
+;
+
+ComparisonExpression:
+    left=PrimaryExpression (operator=ComparisonOperator right=PrimaryExpression)?
+;
+
+ComparisonOperator:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'in'
+;
+
+PrimaryExpression:
+    EntityPropertyRef | LiteralValue | '(' expr=LogicalExpression ')'
+;
+
+EntityPropertyRef:
+    entity=[Entity] '.' property=STRING
+;
+
+LiteralValue:
+    STRING | INT | FLOAT | BOOL
+;
+
+Action:
+    SetPropertyAction | SendMessageAction | CallServiceAction | DelayAction | LogAction
+;
+
+SetPropertyAction:
+    'Action<SetProperty>' name=ID
+    (
+        ('entity:' entity=[Entity])
+        ('property:' property=STRING)
+        ('value:' value=PropertyValue)
+    )#
+    'end'
+;
+
+SendMessageAction:
+    'Action<SendMessage>' name=ID
+    (
+        ('broker:' broker=[MessageBroker])
+        ('topic:' topic=STRING)
+        ('message:' message=STRING)
+        ('qos:' qos=INT)?
+    )#
+    'end'
+;
+
+CallServiceAction:
+    'Action<CallService>' name=ID
+    (
+        ('service:' service=STRING)
+        ('method:' method=STRING)
+        ('parameters:' '[' parameters*=ServiceParam[','] ']')?
+    )#
+    'end'
+;
+
+ServiceParam:
+    name=STRING ':' value=PropertyValue
+;
+
+DelayAction:
+    'Action<Delay>' name=ID
+    (
+        ('duration:' duration=INT)
+        ('unit:' unit=TimeUnit)
+    )#
+    'end'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+LogAction:
+    'Action<Log>' name=ID
+    (
+        ('level:' level=LogLevel)
+        ('message:' message=STRING)
+        ('category:' category=STRING)?
+    )#
+    'end'
+;
+
+LogLevel:
+    'debug' | 'info' | 'warning' | 'error' | 'critical'
+;

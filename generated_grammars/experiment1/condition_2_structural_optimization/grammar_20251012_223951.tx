@@ -1,0 +1,302 @@
+SmartEnvironmentModel:
+    imports*=ImportStm
+    (metadata=Metadata)?
+    (
+        (brokers*=BrokerDef)
+        (auth_mechanisms*=AuthMechanism)
+        (entities*=EntityDef)
+        (automations*=AutomationDef)
+        (conditions*=ConditionDef)
+        (actions*=ActionDef)
+    )#
+;
+
+ImportStm:
+    'import' uri=STRING ('as' alias=ID)?
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=STRING)
+        ('version:' version=STRING)
+        ('description:' description=STRING)?
+        ('author:' author=STRING)?
+        ('timestamp:' timestamp=STRING)?
+        ('system_id:' system_id=STRING)?
+    )#
+    'end'
+;
+
+TopicDef:
+    name=STRING ('qos:' qos=INT)?
+;
+
+BasicAuth:
+    'Auth<Basic>' name=ID
+    (
+        ('username:' username=STRING)
+        ('password:' password=STRING)
+    )#
+    'end'
+;
+
+TokenAuth:
+    'Auth<Token>' name=ID
+    (
+        ('token:' token=STRING)
+        ('token_type:' token_type=STRING)?
+        ('expires_in:' expires_in=INT)?
+    )#
+    'end'
+;
+
+CertAuth:
+    'Auth<Certificate>' name=ID
+    (
+        ('cert_file:' cert_file=STRING)
+        ('key_file:' key_file=STRING)
+        ('ca_file:' ca_file=STRING)?
+    )#
+    'end'
+;
+
+ApiKeyAuth:
+    'Auth<ApiKey>' name=ID
+    (
+        ('api_key:' api_key=STRING)
+        ('header_name:' header_name=STRING)?
+    )#
+    'end'
+;
+
+AuthMechanism:
+    BasicAuth | TokenAuth | CertAuth | ApiKeyAuth
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('client_id:' client_id=STRING)?
+        ('keep_alive:' keep_alive=INT)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+        ('topics:' '-' topics*=TopicDef['-'])?
+    )#
+    'end'
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('virtual_host:' virtual_host=STRING)?
+        ('exchange:' exchange=STRING)?
+        ('ssl:' ssl=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+HTTPBroker:
+    'Broker<HTTP>' name=ID
+    (
+        ('base_url:' base_url=STRING)
+        ('timeout:' timeout=INT)?
+        ('retry_count:' retry_count=INT)?
+        ('ssl_verify:' ssl_verify=BOOL)?
+        ('auth:' auth=[AuthMechanism])?
+    )#
+    'end'
+;
+
+BrokerDef:
+    MQTTBroker | AMQPBroker | HTTPBroker
+;
+
+EntityType:
+    'sensor' | 'actuator' | 'device' | 'controller' | 'gateway' | 'service'
+;
+
+EntityStatus:
+    'online' | 'offline' | 'error' | 'maintenance'
+;
+
+LocationDef:
+    'Location' '(' x=FLOAT ',' y=FLOAT (',' z=FLOAT)? ')'
+;
+
+PropertyType:
+    'bool' | 'int' | 'float' | 'string' | 'json' | 'binary'
+;
+
+JsonPair:
+    key=STRING ':' value=PropertyValue
+;
+
+JsonValue:
+    '{' pairs*=JsonPair[','] '}' | '[' values*=PropertyValue[','] ']'
+;
+
+PropertyValue:
+    FLOAT | INT | BOOL | STRING | JsonValue
+;
+
+PropertyDef:
+    name=ID ':' prop_type=PropertyType ('=' default_value=PropertyValue)? ('unit:' unit=STRING)?
+;
+
+ParameterDef:
+    name=ID ':' param_type=PropertyType
+;
+
+BehaviorDef:
+    name=ID '(' params*=ParameterDef[','] ')' '->' return_type=PropertyType
+;
+
+EntityDef:
+    'Entity' name=ID
+    (
+        ('type:' entity_type=EntityType)
+        ('location:' location=LocationDef)?
+        ('properties:' '-' properties*=PropertyDef['-'])?
+        ('behaviors:' '-' behaviors*=BehaviorDef['-'])?
+        ('broker:' broker=[BrokerDef])?
+        ('topic:' topic=STRING)?
+        ('status:' status=EntityStatus)?
+        ('tags:' '-' tags*=STRING['-'])?
+    )#
+    'end'
+;
+
+ExecutionMode:
+    'sequential' | 'parallel' | 'conditional'
+;
+
+TimeUnit:
+    'seconds' | 'minutes' | 'hours' | 'days'
+;
+
+CronExpression:
+    'cron' '(' expression=STRING ')'
+;
+
+IntervalExpression:
+    'interval' '(' value=INT unit=TimeUnit ')'
+;
+
+TimePointExpression:
+    'at' '(' time=STRING ')'
+;
+
+TimeSchedule:
+    CronExpression | IntervalExpression | TimePointExpression
+;
+
+TimeTrigger:
+    'Time' '(' schedule=TimeSchedule ')'
+;
+
+EventTrigger:
+    'Event' '(' source=[EntityDef] ('property:' property=ID)? ')'
+;
+
+StateTrigger:
+    'State' '(' entity=[EntityDef] '.' property=ID condition=ComparisonOp value=PropertyValue ')'
+;
+
+TriggerDef:
+    TimeTrigger | EventTrigger | StateTrigger
+;
+
+ComparisonOp:
+    '==' | '!=' | '<' | '>' | '<=' | '>=' | 'contains' | 'matches'
+;
+
+LogicalOp:
+    'and' | 'or' | 'not'
+;
+
+EntityCondition:
+    entity=[EntityDef] '.' property=ID comparison=ComparisonOp value=PropertyValue
+;
+
+TimeCondition:
+    'time' comparison=ComparisonOp value=STRING
+;
+
+ValueCondition:
+    left=PropertyValue comparison=ComparisonOp right=PropertyValue
+;
+
+PrimitiveCondition:
+    EntityCondition | TimeCondition | ValueCondition
+;
+
+ConditionTerm:
+    '(' expression=ConditionExpression ')' | PrimitiveCondition
+;
+
+ConditionExpression:
+    left=ConditionTerm (operator=LogicalOp right=ConditionTerm)*
+;
+
+ConditionDef:
+    'Condition' name=ID
+    (
+        ('expression:' expression=ConditionExpression)
+        ('timeout:' timeout=INT)?
+    )#
+    'end'
+;
+
+AutomationDef:
+    'Automation' name=ID
+    (
+        ('trigger:' trigger=TriggerDef)
+        ('conditions:' '-' conditions*=[ConditionDef]['-'])?
+        ('actions:' '-' actions*=[ActionDef]['-'])
+        ('enabled:' enabled=BOOL)?
+        ('priority:' priority=INT)?
+        ('execution_mode:' execution_mode=ExecutionMode)?
+    )#
+    'end'
+;
+
+FailureAction:
+    'retry' | 'abort' | 'continue' | 'notify'
+;
+
+ActionParameter:
+    name=STRING '=' value=PropertyValue
+;
+
+EntityAction:
+    'entity' entity=[EntityDef] method=STRING '(' parameters*=ActionParameter[','] ')'
+;
+
+NotificationAction:
+    'notify' '(' message=STRING (',' recipients*=STRING[','])? ')'
+;
+
+SystemAction:
+    'system' command=STRING '(' parameters*=ActionParameter[','] ')'
+;
+
+ActionOperation:
+    EntityAction | NotificationAction | SystemAction
+;
+
+ActionDef:
+    'Action' name=ID
+    (
+        ('operation:' operation=ActionOperation)
+        ('timeout:' timeout=INT)?
+        ('retry_count:' retry_count=INT)?
+        ('on_failure:' on_failure=FailureAction)?
+    )#
+    'end'
+;
