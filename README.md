@@ -7,6 +7,7 @@ It provides the concrete supplementary artifacts referenced in the revised manus
 - `supplementary/anti_pattern_catalog.md` and `supplementary/anti_pattern_catalog.json`: the complete catalog of twelve grammar-level anti-patterns targeted during structural optimization.
 - `supplementary/reviewer_artifact_examples/`: real grammar and model-generation examples used to illustrate the reported experiments.
 - `prompt_templates/`: the active prompt templates used by the four-phase methodology.
+- `few_shot_grammars/`: the complete GoalDSL, DFlow, and SmAuto grammars used as Phase 1 demonstrations, with the experiment-specific mapping documented in that directory.
 - `evaluation_prompts/`: the 157 CodinTxt and 180 DFlow natural-language evaluation prompts.
 - `requirement_specifications/`: the 8 smart-home, 22 CodinTxt, and 24 DFlow functional requirements.
 - `manual_grammars/`: the manually crafted CodinTxt and DFlow TextX grammars used as Experiment 2 baselines.
@@ -20,6 +21,7 @@ The repository intentionally contains supplementary artifacts and focused valida
 | Paper topic | Repository artifact |
 | --- | --- |
 | Phase 1--4 prompt design | `prompt_templates/` |
+| Phase 1 gold-standard few-shot examples | `few_shot_grammars/` |
 | Experiment 1 and 2 requirements | `requirement_specifications/` |
 | Experiment 2 natural-language evaluation prompts | `evaluation_prompts/` |
 | Phase 2 anti-pattern catalog | `supplementary/anti_pattern_catalog.*` |

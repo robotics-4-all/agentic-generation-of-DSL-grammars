@@ -1,0 +1,818 @@
+AreaGoal:
+   RectangleAreaGoal     |
+   CircularAreaGoal      |
+   StraightLine          |
+   MovingAreaGoal        |
+   PolylineAreaGoal
+;
+
+
+RectangleAreaGoal:
+   'Goal<RectangleArea>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('bottomLeftEdge:' bottomLeftEdge=Point )
+       ('lengthX:' lengthX=NUMBER)
+       ('lengthY:' lengthY=NUMBER)
+       ('tag:' tag=AreaGoalTag )
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#  // Any order
+   'end'
+;
+
+PolylineAreaGoal:
+   'Goal<PolylineArea>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('points:' '[' points+=Point[','] ']' )
+       ('tag:' tag=AreaGoalTag )
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#  // Any order
+   'end'
+;
+
+MovingAreaGoal:
+   'Goal<MovingArea>' name=ID
+   (
+       ('movingEntity:' entity=[Entity:FQN|+pm:entities*])
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('radius:' radius=NUMBER)
+       ('tag:' tag=AreaGoalTag)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#  // Any order
+   'end'
+;
+
+CircularAreaGoal:
+   'Goal<CircularArea>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('center:' center=Point)
+       ('radius:' radius=NUMBER)
+       ('tag:' tag=AreaGoalTag)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+StraightLine:
+   'Goal<StraightLine>' name=ID
+   (
+       ('entities:' '-' entities+=[Entity:FQN|+pm:entities*]['-'])?
+       ('startPoint:' startPoint=Point)
+       ('endPoint:' endPoint=Point)
+       ('tag:' tag=AreaGoalTag)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+AreaGoalTag: 'ENTER' | 'EXIT' | 'AVOID' | 'STEP';
+
+MessageBroker:
+   AMQPBroker | MQTTBroker | RedisBroker
+;
+
+
+Authentication: AuthPlain | AuthApiKey | AuthCert;
+
+AuthPlain:
+   'username' ':' username=STRING
+   'password' ':' password=STRING
+;
+
+AuthApiKey:
+   'key' ':' key=STRING
+;
+
+AuthCert:
+   ('cert' ':' cert=STRING) | ('certPath' ':' certPath=STRING)
+;
+
+AMQPBroker:
+   'Broker<AMQP>' name=ID
+   (
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('vhost:' vhost=STRING)?
+       ('topicExchange:' topicE=STRING)?
+       ('rpcExchange:' rpcE=STRING)?
+       ('ssl' ':' ssl=BOOL)?
+       ('auth' ':' auth=Authentication)?
+   )#
+   'end'
+;
+
+MQTTBroker:
+   'Broker<MQTT>' name=ID
+   (
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('ssl' ':' ssl=BOOL)?
+       ('basePath:' basePath=STRING)?
+       ('webPath:' webPath=STRING)?
+       ('webPort:' webPort=INT)?
+       ('auth' ':' auth=Authentication)?
+   )#
+   'end'
+;
+
+RedisBroker:
+   'Broker<Redis>' name=ID
+   (
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('db:' db=INT)?
+       ('ssl' ':' ssl=BOOL)?
+       ('auth' ':' auth=Authentication)?
+   )#
+   'end'
+;
+
+
+RESTEndpoint:
+   'RESTEndpoint' name=ID
+   (
+       ('verb:' verb=RESTVerb)
+       ('host:' host=STRING)
+       ('port:' port=INT)
+       ('path:' path=STRING)
+       ('base_url:' baseUrl=STRING)?
+       (
+       'params:'
+           ('query:' '-' queryParams*=Property['-'])?
+           ('path:' '-' pathParams*=Property['-'])?
+           ('body:' '-' bodyParams*=Property['-'])?
+       ('headers:' '-' headers*=Property['-'])?
+       )?
+   )#
+   'end'
+;
+
+RESTVerb:
+   'GET'       |
+   'POST'      |
+   'PUT'       |
+   'DELETE'
+;
+
+// === Conditions ===
+
+TermPool:
+   'TermPool' name=ID
+   (
+       conditions*=Condition
+   )#
+   'end'
+;
+
+Condition:
+   r1=ConditionGroup (operator=LogicalOperator r2=ConditionGroup)*
+;
+
+ConditionGroup:
+   '(' r=Condition ')'
+   | PrimitiveCondition
+   | MathExpression
+;
+
+PrimitiveCondition:
+   BoolCondition       |
+   TimeCondition       |
+   NumericCondition    |
+   StringCondition     |
+   ListCondition       |
+   DictCondition
+;
+
+MathExpression:
+   left=MathTerm (operator=PlusOrMinus right=MathTerm)*
+;
+
+MathTerm:
+   left=MathFactor (operator=MulOrDiv right=MathFactor)*
+;
+
+MathFactor:
+   (sign=PlusOrMinus)?
+   (
+       op=MathOperand | '(' op=MathExpression ')'
+   )
+;
+
+MathOperand:
+   (
+   op=NUMBER                  |
+   op=BuiltinNumericFunctions  |
+   op=AttributeRef
+   )
+;
+
+AttributeRef:
+   DictAttributeRef    |
+   ListAttributeRef    |
+   SimpleAttributeRef
+;
+
+SimpleAttributeRef:
+   attribute=[Attribute:FQN|+m:entities.attributes]
+;
+
+DictAttributeRef:
+   attribute=[Attribute:FQN|+pm:entities.attributes] (('[' key=STRING ']')*)?
+;
+
+ListAttributeRef:
+   attribute=[Attribute:FQN|+pm:entities.attributes] (('[' index=INT ']')*)?
+;
+
+PlusOrMinus: '+' | '-';
+MulOrDiv: '*' | '/' ;
+
+NumericCondition:
+   (operand1=MathExpression
+    operator=NumericOperator
+    operand2=MathExpression)
+;
+
+StringCondition:
+   (operand1=AttributeRef
+    operator=StringOperator
+    (operand2=STRING | operand2=AttributeRef))
+;
+
+BoolCondition:
+   (operand1=AttributeRef
+    operator=BooleanOperator
+    (operand2=BOOL | operand2=AttributeRef))
+;
+
+ListCondition:
+   (operand1=AttributeRef
+    operator=ListOperator
+    (operand2=List | operand2=AttributeRef))
+;
+
+DictCondition:
+   (operand1=AttributeRef
+    operator=DictOperator
+    (operand2=Dict | operand2=AttributeRef))
+;
+
+TimeCondition:
+   (operand1=AttributeRef
+    operator=TimeOperator
+    operand2=AttributeRef)
+;
+
+StdAttr:
+   'std' '(' attribute=MathOperand ',' size=INT ')'
+;
+
+VarAttr:
+   'var' '(' attribute=MathOperand ',' size=INT ')'
+;
+
+MeanAttr:
+   'mean' '(' attribute=MathOperand  ',' size=INT ')'
+;
+
+MinAttr:
+   'min' '(' attribute=MathOperand  ',' size=INT ')'
+;
+
+MaxAttr:
+   'max' '(' attribute=MathOperand  ',' size=INT ')'
+;
+
+InRangeAttr:
+   'inrange' '(' attribute=MathOperand  ',' min=NUMBER ',' max=NUMBER ')'
+;
+
+
+BuiltinNumericFunctions:
+   StdAttr         |
+   VarAttr         |
+   MeanAttr        |
+   MinAttr         |
+   MaxAttr         |
+   InRangeAttr
+;
+
+// Operators
+
+// SharedOperator: '==' | '!=' | 'is' | 'is not';
+
+StringOperator: '~' | '!~' | '==' | '!=' | 'is not' | 'is' | 'has' | 'in' | 'not in';
+
+NumericOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+
+LogicalOperator: 'and' | 'or' | 'not' | 'xor' | 'nor' | 'xnor' | 'nand';
+
+BooleanOperator: '==' | '!=' | 'is not' | 'is';
+
+ListOperator: '==' | '!=' | 'is' | 'is not' | 'in' | 'not in';
+
+DictOperator: '==' | '!=' | 'is' | 'is not';
+
+TimeOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+
+EntitySource:
+   (ref=[MessageBroker])       |
+   (ref=[RESTEndpoint])
+;
+
+/*
+EntitySource:
+   BrokerSource |
+   RestSource
+;
+
+BrokerSource:
+   brokerRef=[MessageBroker] '@' uri=STRING
+;
+
+RestSource:
+   endpointRef=[RESTEndpoint]
+;
+*/
+
+/*
+DBSQLSource:
+   dbRef=[DBSQL] '@' query=STRING
+;
+
+DBNoSQLource:
+   dbRef=[DBNoSQL] '@' collection=STRING ',' filter=STRING
+;
+*/
+
+Entity:
+   'Entity' name=ID
+   (
+       ('type:' etype=EntityType)
+       ('source:' source=EntitySource)
+       ('mode:' mode=EntityMode)?
+       ('freq:' mode=NUMBER)?
+       ('attributes:' '-' attributes*=Attribute['-'])?
+       ('uri:' uri=STRING)?
+       ('description:' description=STRING)?
+       ('compartments'
+           entities*=Entity
+       'end')?
+   )#
+   'end'
+;
+
+EntityType:
+   'sensor'    |
+   'actuator'  |
+   'hybrid'    |
+   'robot'     |
+   'other'
+;
+
+EntityMode:
+   'virtual'       |
+   'simulation'    |
+   'real'          |
+   'digitwin'      |
+   'other'
+;
+
+Attribute:
+   name=ID ':' dtype=[DataType:FQN|+m:types*]
+       ( '('precision_x=INT (',' precision_y=INT)? ')' )?
+       ( '[' lower=MultiplicityBound (',' upper=MultiplicityBound )? ']' )?
+;
+
+EntityGoal:
+   EntityStateChangeGoal       |
+   EntityStateConditionGoal    |
+   EntityPyConditionGoal       |
+   EntityAttrStreamGoal
+;
+
+EntityStateChangeGoal:
+   'Goal<EntityStateChange>' name=ID
+   (
+       // ('entities:' '-' entities*=[Entity:FQN|+m:entities*]['-'])
+       ('entity:' entity=[Entity:FQN|+m:entities*])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+EntityStateConditionGoal:
+   'Goal<EntityStateCondition>' name=ID
+   (
+       ('condition:' condition=Condition)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+EntityPyConditionGoal:
+   'Goal<EntityPyCondition>' name=ID
+   (
+       ('condition:' condition=STRING)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+/*
+EntityAttrStreamGoal:
+   'Goal<EntityAttrStream>' name=ID
+   (
+       ('streams:' '-' streams+=AttrStreamDefinition['-'])
+       // ('strategy:' strategy=[EntityAttrStreamStrategy])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+AttrStreamDefinition:
+   attr=[Attribute:FQN|+pm:entities.attributes*] ':' '[' values+=BASETYPE[','] ']' '->' strategy=[EntityAttrStreamStrategy]
+;
+*/
+
+
+EntityAttrStreamGoal:
+   'Goal<EntityAttrStream>' name=ID
+   (
+       ('stream:' stream=AttrStreamDefinition)
+       ('strategy:' strategy=[EntityAttrStreamStrategy])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+
+AttrStreamDefinition:
+   attr=[Attribute:FQN|+pm:entities.attributes*] ':' '[' values+=BASETYPE[','] ']'
+;
+
+EntityAttrStreamStrategy:
+   'ALL'               |
+   'NONE'              |
+   'AT_LEAST_ONE'      |
+   'JUST_ONE'          |
+   'EXACTLY_X'         |
+   'ALL_ORDERED'       |
+   'EXACTLY_X_ORDERED'
+;
+
+EntityStateTransitionGoal:
+   'Goal<EntityStateTransition>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+m:entities*])
+       ('previous:' previous=Condition)
+       ('next:' next=Condition)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+PoseGoal:
+   'Goal<Pose>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('orientation:' orientation=Orientation)
+       ('position:' position=Point)
+       ('maxDeviationPos:' maxDeviationPos=NUMBER)
+       ('maxDeviationOri:' maxDeviationOri=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+OrientationGoal:
+   'Goal<Orientation>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('orientation:' orientation=Orientation)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+PositionGoal:
+   'Goal<Position>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('position:' point=Point)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+TimeConstraint:
+   type=TimeConstraintType '(' (comparator=ArithmeticComparator)? time=FLOAT ')'
+;
+
+ArithmeticComparator: '>' | '<' | '==' | '>=' | '<=';
+
+TimeConstraintType:
+   'FROM_SCENARIO_START'   |
+   'FROM_GOAL_START'       |
+   'FOR_TIME'              |
+   'BETWEEN_GOALS_MIN'     |
+   'BETWEEN_GOALS_MAX'
+;
+
+TrajectoryGoal:
+   StraightLineTrajectoryGoal  |
+   WaypointTrajectoryGoal
+;
+
+StraightLineTrajectoryGoal:
+   'Goal<StraightLineTrajectory>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('startPoint:' startPoint=Point)
+       ('finishPoint:' finishPoint=Point)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+WaypointTrajectoryGoal:
+   'Goal<WaypointTrajectory>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('points:' '[' points+=Point[','] ']')
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+CurveTrajectoryGoal:
+   'Goal<CurveTrajectoryGoal>' name=ID
+   (
+       ('entity:' entity=[Entity:FQN|+pm:entities*])
+       ('startPoint:' startPoint=Point)
+       ('finishPoint:' finishPoint=Point)
+       ('maxDeviation:' maxDeviation=NUMBER)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+Time:
+   hour=INT ':' minute=INT (':' second=INT)?
+;
+
+Date: month=INT ':' day=INT ':' year=INT;
+
+// Hours: /[0-2]?[0-9]?/;
+// Minutes: /[0-5][0-9]/;
+
+List:
+   '[' items*=ListItem[','] ']'
+;
+
+ListItem:
+   NUMBER | STRING | BOOL | List | Dict | OBJECT
+;
+
+Dict:
+   '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+   name=STRING ':' value=DictType
+;
+
+DictType:
+   NUMBER | STRING | BOOL | Dict | List | OBJECT
+;
+
+Description: /\#(.*?)$/;
+
+
+DataType: PrimitiveDataType | CustomDataType | Enumeration;
+
+CustomDataType:
+   'DataType' name=ID
+       (description=Description)?
+       properties*=Property  // Each Message has one or more properties.
+   'end'
+;
+
+Enumeration:
+   'Enum' name=ID
+       (description=Description)?
+       elements+=EnumerationElement
+   'end'
+;
+
+EnumerationElement: name=STRING;
+
+// Primitive data types
+PrimitiveDataType:
+   'type' name=ID
+;
+
+Property:
+   ListProperty    |
+   SimpleProperty
+;
+
+SimpleProperty:
+   name=ID ':' type=[DataType:FQN|+m:types] ('=' default=STRING)?
+;
+
+ListProperty:
+   name=ID ':' type=[DataType:FQN|+m:types]'[' ( multiplicity=MultiplicityBound )? ']'
+;
+
+MultiplicityBound:
+   INT | '*'
+;
+
+// Special types
+Point: Point2D | Point3D;
+Orientation: Orientation2D | Orientation3D;
+
+Point2D:
+   'Point2D' '(' x=NUMBER ',' y=NUMBER ')'
+;
+
+Point3D:
+   'Point3D' '(' x=NUMBER ',' y=NUMBER ',' z=NUMBER ')'
+;
+
+Orientation2D:
+   'Orientation2D' '(' z=NUMBER ')'
+;
+
+Orientation3D:
+   'Orientation3D' '(' x=NUMBER ',' y=NUMBER ',' z=NUMBER ')'
+;
+
+// Utilities ------------------------------------->
+
+FQN[noskipws]:
+   /\s*/- ID ('.' ID)*
+;
+
+FQID[noskipws]:
+   /\s*/-
+   LID+['.']
+;
+
+// Language ID
+LID:
+   // Forbid keywords as IDs for better error reporting.
+   !Keyword ID
+;
+
+Import: 'import' importURI=FQN ('as' name=ID)?;
+
+Keyword:
+   'import'
+;
+
+// Special rule for comments. Comments start with //
+Comment: CommentLine | CommentBlock ;
+
+CommentLine: /\/\/.*?$/;
+
+CommentBlock: /\/\*(.|\n)*?\*\//;
+
+MULTILINE_STRING: /\"\"\"(.|\n)*?\"\"\"/;
+
+// <-----------------------------------------------
+
+Goal:
+   EntityGoal           |
+   AreaGoal             |
+   PoseGoal             |
+   PositionGoal         |
+   OrientationGoal      |
+   TrajectoryGoal       |
+   ComplexGoal          |
+   GoalRepeater         |
+   GTermGoal
+;
+
+
+ComplexGoal:
+   'Goal<Complex>' name=ID
+   (
+       ('goals:' '-' goals*=WeightedGoal['-'])
+       ('strategy:' algorithm=[ComplexGoalAlgorithmType])
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+       ('xAccomplished:' xAccomplished=INT)?
+   )#
+   'end'
+;
+
+ComplexGoalAlgorithmType:
+   'ALL_ACCOMPLISHED'               |
+   'NONE_ACCOMPLISHED'              |
+   'AT_LEAST_ONE_ACCOMPLISHED'      |
+   'JUST_ONE_ACCOMPLISHED'          |
+   'EXACTLY_X_ACCOMPLISHED'         |
+   'ALL_ACCOMPLISHED_ORDERED'       |
+   'EXACTLY_X_ACCOMPLISHED_ORDERED'
+;
+
+// ======================================================================
+GTermGoal:
+   'Goal<GTerm>' name=ID
+   (
+       ('terms:' '-' terms*=GoalTermDef['-'])
+       ('operator:' operator=LogicalOperator)?
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+GoalTermDef:
+   r1=GoalTermGroup (operator=LogicalOperator r2=GoalTermGroup)*
+;
+
+GoalReference:
+   r=[Goal:FQN|+m:goals*]
+;
+
+GoalTermGroup:
+   '(' r=GoalTermDef ')' |
+   r=GoalReference
+;
+// ======================================================================
+
+GoalRepeater:
+   'Goal<Repeater>' name=ID
+   (
+       ('goal:' goal=[Goal:FQN|+m:goals*])
+       ('times:' times=INT)
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+   )#
+   'end'
+;
+
+WeightedGoal:
+   goal=[Goal:FQN|+m:goals*] ('->' weight=FLOAT)?
+;
+
+GoalDSLModel:
+   imports*=Import
+   (metadata=Metadata)?
+   (
+       (rtmonitor=RTMonitor)?
+       (brokers*=MessageBroker)
+       (types*=CustomDataType)
+       (entities*=Entity)
+       (goals*=Goal)
+       (restEndpoints*=RESTEndpoint)
+       (scenarios*=Scenario)
+   )#
+;
+
+
+Metadata:
+   'Metadata'
+   (
+       ('name:' name=ID)
+       ('version:' version=STRING)
+       ('author:' author=STRING)?
+       ('email:' email=STRING)?
+       ('description:' description=STRING)?
+   'end'
+   )#
+;
+
+RTMonitor:
+   'RTMonitor'
+   (
+       ('broker:' broker=[MessageBroker])
+       ('namespace:' ns=STRING)?
+       ('eventTopic:' eTopic=STRING)?
+       ('logsTopic:' lTopic=STRING)?
+   'end'
+   )#
+;
+
+
+Scenario:
+   'Scenario' name=ID
+   (
+       ('goals:' '-' goals*=WeightedGoal['-'])
+       ('antigoals:' '-' antigoals*=WeightedGoal['-'])?
+       ('fatals:' '-' fatals*=[Goal:FQN|+m:goals*]['-'])?
+       ('timeConstraints:' '-' timeConstraints*=TimeConstraint['-'])?
+       ('concurrent:' concurrent=BOOL)?
+       ('tickFreq:' goalTickFreqHz=NUMBER)?
+       ('description:' description=STRING)?
+       ('namespace:' ns=STRING)?
+   )#
+   'end'
+;
+

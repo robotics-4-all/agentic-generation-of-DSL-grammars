@@ -1,0 +1,682 @@
+// =====================================================================
+// ROOT MODEL
+// =====================================================================
+
+SmAutoModel:
+    imports*=Import
+    (
+        (metadata=Metadata)?
+        (monitor=RTMonitor)?
+        brokers*=MessageBroker
+        endpoints*=RESTEndpoint
+        constants*=ConstDef
+        scenes*=SceneDef
+        entities*=Entity
+        groups*=EntityGroup
+        automations*=Automation
+    )#
+;
+
+Metadata:
+    'Metadata'
+    (
+        ('name:' name=ID)
+        ('version:' version=STRING)
+        ('author:' author=STRING)?
+        ('email:' email=STRING)?
+        ('description:' description=STRING)?
+        'end'
+    )#
+;
+
+RTMonitor:
+    'RTMonitor'
+    (
+        ('source:' source=[MessageBroker])
+        ('namespace:' ns=STRING)?
+        ('eventTopic:' eTopic=STRING)?
+        ('logsTopic:' lTopic=STRING)?
+        'end'
+    )#
+;
+
+Condition: AdvancedCondition | PrimitiveCondition | ConditionGroup ;
+
+ConditionGroup:
+    '(' r1=Condition ')' operator=LogicalOperator '(' r2=Condition ')'
+;
+
+PrimitiveCondition:
+    ConstRefCondition   |
+    AutomationStatusCondition |
+    TimeCondition       |
+    NumericCondition    |
+    BoolCondition       |
+    StringCondition     |
+    ListCondition       |
+    DictCondition
+;
+
+ConstRefCondition:
+    (operand1=GenericAttrRef
+     operator=ConstRefOperator
+     operand2=ConstRef)
+     ('deadband' deadband=NUMBER)?
+     ('for' forDuration=NUMBER)?
+;
+
+GenericAttrRef:
+    attribute=[Attribute:FQN|+m:entities.attributes]
+;
+
+ConstRefOperator:
+    '>=' | '<=' | '!=' | '==' | '>' | '<' | 'is not' | 'is' | '!~' | '~' | 'not in' | 'has' | 'in'
+;
+
+AutomationStatusCondition:
+    operand1=AutomationStatusRef
+    operator=StatusOperator
+    operand2=AutomationStatus
+;
+
+AutomationStatusRef:
+    automation=ID '.status'
+;
+
+AutomationStatus:
+    'IDLE' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'FINISHED' | 'TERMINATED'
+;
+
+StatusOperator: '==' | '!=' ;
+
+AdvancedCondition: TimeRangeCondition | InRangeCondition | MathExpression;
+
+InRangeCondition:
+    attribute=AugmentedNumericAttr  'in range'
+        '[' (min=ConstRef | min=NUMBER) ',' (max=ConstRef | max=NUMBER) ']'
+;
+
+TimeRangeCondition:
+    attribute=SimpleTimeAttr 'in range'
+        '[' min=Time ',' max=Time ']'
+;
+
+MathExpression:
+    'math' '(' op=MathTerm (op=PlusOrMinus op=MathTerm)* ')'
+;
+
+PlusOrMinus: '+' | '-';
+MulOrDiv: '*' | '/' ;
+
+MathTerm: op=MathFactor (op=MulOrDiv op=MathFactor)*;
+
+MathFactor: (sign=PlusOrMinus)?  op=MathOperand;
+
+MathOperand: op=NUMBER | op=[NumericAttribute:FQN|+m:entities.attributes] |
+    ('(' op=MathExpression ')');
+
+StdAttr:
+    'std' '(' attribute=AugmentedNumericAttr ',' size=INT ')'
+;
+
+VarAttr:
+    'var' '(' attribute=AugmentedNumericAttr ',' size=INT ')'
+;
+
+MeanAttr:
+    'mean' '(' attribute=AugmentedNumericAttr  ',' size=INT ')'
+;
+
+MinAttr:
+    'min' '(' attribute=AugmentedNumericAttr  ',' size=INT ')'
+;
+
+MaxAttr:
+    'max' '(' attribute=AugmentedNumericAttr  ',' size=INT ')'
+;
+
+DeltaAttr:
+    'delta' '(' attribute=AugmentedNumericAttr ',' size=INT ')'
+;
+
+RateAttr:
+    'rate' '(' attribute=AugmentedNumericAttr ',' size=INT ')'
+;
+
+MultiplyAttr:
+    'mul' '(' attribute*=AugmentedNumericAttr[','] ')'
+;
+
+AugmentedAttr:
+    AugmentedNumericAttr |
+    AugmentedStringAttr  |
+    AugmentedBoolAttr    |
+    AugmentedListAttr    |
+    AugmentedDictAttr
+;
+
+NumericCondition:
+    (operand1=AugmentedNumericAttr
+     operator=NumericOperator
+     (operand2=NUMBER | operand2=AugmentedNumericAttr))
+     ('deadband' deadband=NUMBER)?
+     ('for' forDuration=NUMBER)?
+;
+
+StringCondition:
+    (operand1=AugmentedStringAttr
+     operator=StringOperator
+     (operand2=STRING | operand2=AugmentedStringAttr))
+;
+
+BoolCondition:
+    (operand1=AugmentedBoolAttr
+     operator=BooleanOperator
+     (operand2=BOOL | operand2=AugmentedBoolAttr))
+;
+
+ListCondition:
+    (operand1=AugmentedListAttr
+     operator=ListOperator
+     (operand2=List | operand2=AugmentedListAttr))
+;
+
+DictCondition:
+    (operand1=AugmentedDictAttr
+     operator=DictOperator
+     (operand2=Dict | operand2=AugmentedDictAttr))
+;
+
+TimeCondition:
+    (operand1=SimpleTimeAttr
+     operator=TimeOperator
+     operand2=Time)
+;
+
+AugmentedNumericAttr:
+    StdAttr         |
+    VarAttr         |
+    MeanAttr        |
+    MinAttr         |
+    MaxAttr         |
+    DeltaAttr       |
+    RateAttr        |
+    MultiplyAttr    |
+    SimpleNumericAttr
+;
+
+AugmentedStringAttr: SimpleStringAttr;
+
+AugmentedBoolAttr: SimpleBoolAttr;
+
+AugmentedListAttr: SimpleListAttr;
+
+AugmentedDictAttr: SimpleDictAttr;
+
+SimpleNumericAttr:
+    attribute=[NumericAttribute:FQN|+m:entities.attributes]
+;
+
+SimpleStringAttr:
+    attribute=[StringAttribute:FQN|+m:entities.attributes]
+;
+
+SimpleBoolAttr:
+    attribute=[BoolAttribute:FQN|+m:entities.attributes]
+;
+
+SimpleListAttr:
+    attribute=[ListAttribute:FQN|+m:entities.attributes]
+;
+
+SimpleDictAttr:
+    attribute=[DictAttribute:FQN|+m:entities.attributes]
+;
+
+SimpleTimeAttr:
+    attribute=[TimeAttribute:FQN|+m:entities.attributes]
+;
+
+// Condition operators
+StringOperator: '~' | '!~' | '==' | '!=' | 'has' | 'in' | 'not in';
+
+NumericOperator: '>=' | '>' | '<=' | '<' | '==' | '!=';
+
+LogicalOperator: 'AND' | 'OR' | 'NOT' | 'XOR' | 'NOR' | 'XNOR' | 'NAND';
+
+BooleanOperator: 'is not' | 'is';
+
+ListOperator: '==' | '!=' | 'is' | 'is not' | 'in' | 'not in';
+
+DictOperator: '==' | '!=' | 'is' | 'is not';
+
+TimeOperator: '>=' | '>' | '<=' | '<' | '==' | '!=' | 'is not' | 'is';
+
+// Wrapper rule for optional BOOL — allows distinguishing absent (None) from false
+OptBool: val=BOOL;
+
+// === Automation (ECA Rule) ===
+Automation:
+    'Automation' name=ID
+    (
+        ('when' condition=Condition)?
+        ('then' actions*=Action)?
+        ('else' elseActions*=Action)?
+        ('config'
+            (
+                ('description:' description=STRING)?
+                ('freq:' freq=INT)?
+                ('enabled:' enabled=OptBool)?
+                ('continuous:' continuous=OptBool)?
+                ('checkOnce:' checkOnce=BOOL)?
+                ('delay:' delay=FLOAT)?
+                ('cooldown:' cooldown=FLOAT)?
+            )#
+        )?
+        ('triggers' triggers*=[Automation:FQN|+m:automations][','])?
+        ('terminates' terminates*=[Automation:FQN|+m:automations][','])?
+    )#
+    'end'
+;
+
+// === Scene Definition ===
+SceneDef:
+    'Scene' name=ID
+        actions+=Action
+    'end'
+;
+
+// === Actions ===
+Action:
+    HttpAction | LogAction | WaitAction | ApplySceneAction | GroupSetAction | SetAction
+;
+
+// === HTTP / Webhook Action ===
+HttpAction:
+    'http' method=HttpMethod url=STRING
+    (
+        ('headers:' headers*=HttpHeader)?
+        ('body:' body=STRING)?
+        ('timeout:' timeout=NUMBER)?
+    )#
+    'end'
+;
+
+HttpMethod: 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+HttpHeader:
+    '-' key=STRING '=' value=STRING
+;
+
+GroupSetAction:
+    'set' group=[EntityGroup:ID|+m:groups] '.' attr=ID '<-' (value=BOOL | value=STRING | value=NUMBER)
+;
+
+ApplySceneAction:
+    'apply' name=ID
+;
+
+LogAction:
+    'log' message=STRING ('level' level=LogLevel)?
+;
+
+LogLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR';
+
+WaitAction:
+    'wait' duration=NUMBER
+;
+
+SetAction:
+    FloatSetAction | IntSetAction | BoolSetAction | StringSetAction | ListSetAction | DictSetAction | ExprSetAction | ConstSetAction
+;
+
+ConstSetAction:
+    attribute=[Attribute:FQN|+m:entities.attributes] '<-' value=ConstRef
+;
+
+ExprSetAction:
+    attribute=[NumericAttribute:FQN|+m:entities.attributes] '<-'
+    'expr' '(' expr=ActionExpr ')'
+;
+
+ActionExpr:
+    op=ActionTerm (op=ActionAddOp op=ActionTerm)*
+;
+
+ActionAddOp: '+' | '-';
+ActionMulOp: '*' | '/';
+
+ActionTerm:
+    op=ActionFactor (op=ActionMulOp op=ActionFactor)*
+;
+
+ActionFactor:
+    op=ActionOperand
+;
+
+ActionOperand:
+    AttrRefOperand | NumberOperand
+;
+
+NumberOperand:
+    val=NUMBER
+;
+
+AttrRefOperand:
+    ref=[NumericAttribute:FQN|+m:entities.attributes]
+;
+
+IntSetAction:
+    attribute=[IntAttribute:FQN|+m:entities.attributes] '<-' value=INT
+;
+
+FloatSetAction:
+    attribute=[FloatAttribute:FQN|+m:entities.attributes] '<-' value=STRICTFLOAT
+;
+
+StringSetAction:
+    attribute=[StringAttribute:FQN|+m:entities.attributes] '<-' value=STRING
+;
+
+BoolSetAction:
+    attribute=[BoolAttribute:FQN|+m:entities.attributes] '<-' value=BOOL
+;
+
+ListSetAction:
+    attribute=[ListAttribute:FQN|+m:entities.attributes] '<-' value=List
+;
+
+DictSetAction:
+    attribute=[DictAttribute:FQN|+m:entities.attributes] '<-' value=Dict
+;
+
+// =====================================================================
+// COMMUNICATION (brokers, auth, REST endpoints)
+// =====================================================================
+
+MessageBroker:
+    AMQPBroker | MQTTBroker | RedisBroker
+;
+
+Authentication: AuthPlain | AuthApiKey | AuthCert;
+
+AuthPlain:
+    'username' ':' username=STRING
+    'password' ':' password=STRING
+;
+
+AuthApiKey:
+    'key' ':' key=STRING
+;
+
+AuthCert:
+    ('cert' ':' cert=STRING) | ('certPath' ':' certPath=STRING)
+;
+
+AMQPBroker:
+    'Broker<AMQP>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('vhost:' vhost=STRING)?
+        ('topicExchange:' topicE=STRING)?
+        ('rpcExchange:' rpcE=STRING)?
+        ('ssl' ':' ssl=BOOL)?
+        ('auth' ':' auth=Authentication)?
+    )#
+    'end'
+;
+
+MQTTBroker:
+    'Broker<MQTT>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('ssl' ':' ssl=BOOL)?
+        ('basePath:' basePath=STRING)?
+        ('webPath:' webPath=STRING)?
+        ('webPort:' webPort=INT)?
+        ('auth' ':' auth=Authentication)?
+    )#
+    'end'
+;
+
+RedisBroker:
+    'Broker<Redis>' name=ID
+    (
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('db:' db=INT)?
+        ('ssl' ':' ssl=BOOL)?
+        ('auth' ':' auth=Authentication)?
+    )#
+    'end'
+;
+
+RESTEndpoint:
+    'RESTEndpoint' name=ID
+    (
+        ('verb:' verb=RESTVerb)
+        ('host:' host=STRING)
+        ('port:' port=INT)
+        ('path:' path=STRING)
+        ('base_url:' baseUrl=STRING)?
+        (
+            'params:'
+            ('query:' '-' queryParams*=Property['-'])?
+            ('path:' '-' pathParams*=Property['-'])?
+            ('body:' '-' bodyParams*=Property['-'])?
+            ('headers:' '-' headers*=Property['-'])?
+        )?
+    )#
+    'end'
+;
+
+RESTVerb:
+    'GET'       |
+    'POST'      |
+    'PUT'       |
+    'DELETE'
+;
+
+PropertyType: 'int' | 'float' | 'str' | 'bool' | 'list' | 'dict';
+
+Property:
+    name=ID ':' type=PropertyType
+;
+
+EntitySource:
+    (ref=[MessageBroker])       |
+    (ref=[RESTEndpoint])
+;
+
+// =====================================================================
+// CONSTANTS
+// =====================================================================
+
+// === Model-Level Constants ===
+ConstDef:
+    'Const' name=ID '=' (value=NUMBER | value=BOOL | value=STRING)
+;
+
+ConstRef:
+    'const' '(' name=ID ')'
+;
+
+// =====================================================================
+// ENTITIES, ATTRIBUTES, VALUE GENERATORS and GROUPS
+// =====================================================================
+
+Entity:
+    'Entity' name=ID
+    (
+        ('type:' etype=EntityType)
+        ('uri:' uri=STRING)
+        ('description:' description=STRING)?
+        ('freq:' freq=NUMBER)?
+        ('source:' source=EntitySource)
+        ('attributes:' '-' attributes*=Attribute['-'])
+    )#
+    'end'
+;
+
+EntityType:
+    'sensor' |
+    'actuator' |
+    'hybrid'
+;
+
+Attribute:
+    NumericAttribute    |
+    BoolAttribute       |
+    StringAttribute     |
+    TimeAttribute       |
+    ListAttribute       |
+    DictAttribute
+;
+
+NumericAttribute:
+    IntAttribute | FloatAttribute
+;
+
+IntAttribute:
+    name=ID ':' 'int' ('=' default=INT)?
+    ('->' generator=NumericValueGen ('with noise' noise=Noise)?)?
+;
+
+FloatAttribute:
+    name=ID ':' 'float' ('=' default=FLOAT)?
+    ('->' generator=NumericValueGen ('with noise' noise=Noise)?)?
+;
+
+StringAttribute:
+    name=ID ':' 'str' ('=' default=STRING)?
+;
+
+BoolAttribute:
+    name=ID ':' 'bool' ('=' default=BOOL)?
+    ('->' generator=BooleanValueGen)?
+;
+
+ListAttribute:
+    name=ID ':' 'list' ('=' '[' default*=OBJECT[','] ']')?
+    ('->' generator=ListValueGen)?
+;
+
+DictAttribute:
+    name=ID ':' 'dict' ('=' '{' items*=Attribute[','] '}')?
+    ('->' generator=DictValueGen)?
+;
+
+TimeAttribute:
+    name=ID ':' 'time' ('=' default=Time)?
+;
+
+NumericValueGen:
+    ConstantFun     |
+    LinearFun       |
+    SawFun          |
+    GaussianFun     |
+    SinusFun        |
+    ReplayFun       |
+    ReplayFileFun
+;
+
+BooleanValueGen: ReplayFun | ReplayFileFun;
+
+ListValueGen: ReplayFun | ReplayFileFun;
+
+DictValueGen: ReplayFun | ReplayFileFun;
+
+GaussianFun:
+    'gaussian' '(' value=NUMBER ',' maxValue=NUMBER ',' sigma=NUMBER ')'
+;
+
+SinusFun:
+    'sinus' '(' dc=NUMBER ',' amplitude=NUMBER ',' step=NUMBER ')'
+;
+
+ConstantFun:
+    'constant' '(' value=NUMBER ')'
+;
+
+LinearFun:
+    'linear' '(' start=NUMBER ',' step=NUMBER ')'
+;
+
+SawFun:
+    'saw' '(' min=NUMBER ',' max=NUMBER ',' step=NUMBER ')'
+;
+
+// The concept: you either want to provide specific patterns, or you have
+// kept values captured from real sensors and want to replay them.
+ReplayFun:
+    'replay' '(' '[' values*=BASETYPE[','] ']' ',' times=INT ')'
+;
+
+ReplayFileFun:
+    'replay' '(' filepath=STRING ')'
+;
+
+Noise: UniformNoise | GaussianNoise;
+
+UniformNoise:
+    'uniform' '(' min=NUMBER ',' max=NUMBER ')'
+;
+
+GaussianNoise:
+    'gaussian' '(' mu=NUMBER ',' sigma=NUMBER ')'
+;
+
+EntityGroup:
+    'Group' name=ID
+        members+=[Entity:FQN][',']
+    'end'
+;
+
+// =====================================================================
+// TYPES
+// =====================================================================
+
+Time:
+    hour=INT ':' minute=INT (':' second=INT)?
+;
+
+Date: month=INT ':' day=INT ':' year=INT;
+
+List:
+    '[' items*=ListItem[','] ']'
+;
+
+ListItem:
+    NUMBER | STRING | BOOL | List | Dict | OBJECT
+;
+
+Dict:
+    '{' items*=DictItem[','] '}'
+;
+
+DictItem:
+    name=STRING ':' value=DictType
+;
+
+DictType:
+    NUMBER | STRING | BOOL | Dict | List | OBJECT
+;
+
+// =====================================================================
+// UTILS (fully-qualified names, imports, comments)
+// =====================================================================
+
+FQN: ID+['.'];
+FQNI: ID+['.']('.*')?;
+
+NID: /(.*?)\n/;
+NIDREF: NID+['.']('.*')?;
+
+Import: 'import' name=STRING;
+
+// Comments
+Comment: CommentLine | CommentBlock ;
+CommentLine: /\/\/.*?$/;
+CommentBlock: /\/\*(.|\n)*?\*\//;
